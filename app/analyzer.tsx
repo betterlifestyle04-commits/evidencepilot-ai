@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
@@ -21,11 +22,12 @@ const examples = [
   { title: "Explore a contextual claim", tag: "Geography", text: "The Sahara is the largest desert on Earth." }
 ];
 
-function reportMarkdown(report: Report, original: string) {
+function reportMarkdown(report: Report, original: string, reviewedUrls: string[], completedAt: string | null) {
   const lines: string[] = [
     "# EvidencePilot evidence report",
     "",
     "This is AI-assisted research. Sources must be reviewed independently.",
+    ...(completedAt ? ["Analysis completed (UTC): " + completedAt] : []),
     "",
     "## Original submitted text",
     "",
@@ -51,7 +53,11 @@ function reportMarkdown(report: Report, original: string) {
       lines.push("");
     }
   });
-  lines.push("## Suggested cautious rewrite", "", report.rewrite, "", "Model: " + report.model);
+  lines.push("## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
+  for (const source of uniqueCitedSources(report.claims)) {
+    lines.push("- [" + (reviewedUrls.includes(source.url) ? "x" : " ") + "] [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")");
+  }
+  lines.push("", "Model: " + report.model);
   if (report.investigation) lines.push("Searches: " + report.investigation.uniqueSearches + " (follow-up: " + report.investigation.followupSearches + ")");
   return lines.join("\n");
 }
@@ -80,6 +86,9 @@ export default function Analyzer() {
   const [content, setContent] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [busy, setBusy] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [reviewedUrls, setReviewedUrls] = useState<string[]>([]);
+  const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [mode, setMode] = useState<AnalysisMode>("quick");
   const [submittedContent, setSubmittedContent] = useState("");
   const [error, setError] = useState("");
@@ -88,9 +97,20 @@ export default function Analyzer() {
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
-  const markdown = report ? reportMarkdown(report, submittedContent) : "";
+  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
+
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    const interval = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, [busy]);
+
+  function toggleReviewedSource(url: string) {
+    setReviewedUrls(previous => previous.includes(url) ? previous.filter(item => item !== url) : [...previous, url]);
+  }
 
   function useExample(text: string) {
     setContent(text);
@@ -130,6 +150,7 @@ export default function Analyzer() {
   async function analyze() {
     if (!canAnalyze) return;
     setBusy(true);
+    setElapsedSeconds(0);
     setError("");
     setNotice("");
     setReport(null);
@@ -152,6 +173,8 @@ export default function Analyzer() {
         throw new Error("The analysis service returned an incomplete report.");
       }
       setSubmittedContent(submitted);
+      setReviewedUrls([]);
+      setCompletedAt(new Date().toISOString());
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
       window.requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -173,7 +196,7 @@ export default function Analyzer() {
 
   function downloadJson() {
     if (!report) return;
-    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), original: submittedContent, report };
+    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, note: "Reader-marked only; not independent verification." } };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -250,7 +273,7 @@ export default function Analyzer() {
             </div>
             <div className="input-divider" />
             <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
-            {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Consulting Nemotron and researching sources with Tavily. This may take a little time.</div>}
+            {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Live {mode === "deep" ? "deep investigation" : "quick check"} in progress. <span className="busy-duration" aria-hidden="true">{elapsedSeconds}s elapsed.</span> Provider requests may take some time; this is a real timer, not simulated research stages.</div>}
             {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span></div>}
           </div>
           <div className="examples">
@@ -284,8 +307,9 @@ export default function Analyzer() {
 
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
-          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p></div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
+          {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
           <div className="report-list">
             {report.claims.map((claim, index) => <article className="claim-card" key={index}>
@@ -297,6 +321,7 @@ export default function Analyzer() {
               <button className="claim-copy" type="button" onClick={() => copyText(claim.claim + "\n\n" + claim.explanation, "Claim assessment")}>Copy assessment ↗</button>
             </article>)}
           </div>
+          <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} />
           <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report), "Sourced draft")}>Copy with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
           {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
