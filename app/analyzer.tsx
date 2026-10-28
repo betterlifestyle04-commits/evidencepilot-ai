@@ -20,11 +20,15 @@ const examples = [
   { title: "European affairs", tag: "Society", text: "The European Union has 27 member countries. Norway is a member of the European Union." }
 ];
 
-function reportMarkdown(report: Report) {
+function reportMarkdown(report: Report, original: string) {
   const lines: string[] = [
     "# EvidencePilot evidence report",
     "",
     "This is AI-assisted research. Sources must be reviewed independently.",
+    "",
+    "## Original submitted text",
+    "",
+    ...original.split("\n").map(line => "> " + line),
     "",
     "## Claim assessments",
     ""
@@ -46,7 +50,7 @@ function reportMarkdown(report: Report) {
       lines.push("");
     }
   });
-  lines.push("## Original text", "", "See submitted original in the workspace.", "", "## Suggested cautious rewrite", "", report.rewrite, "", "Model: " + report.model);
+  lines.push("## Suggested cautious rewrite", "", report.rewrite, "", "Model: " + report.model);
   if (report.investigation) lines.push("Searches: " + report.investigation.uniqueSearches + " (follow-up: " + report.investigation.followupSearches + ")");
   return lines.join("\n");
 }
@@ -61,7 +65,7 @@ export default function Analyzer() {
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
-  const markdown = report ? reportMarkdown(report) : "";
+  const markdown = report ? reportMarkdown(report, content) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
