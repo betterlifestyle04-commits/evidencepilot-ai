@@ -15,9 +15,9 @@ const verdicts: Record<Verdict, { label: string; short: string }> = {
 };
 
 const examples = [
-  { title: "Space & science", tag: "Science", text: "Venus is the hottest planet in the Solar System. Mars has three natural moons." },
-  { title: "Product history", tag: "Technology", text: "The first iPhone was introduced in 2007. The original iPhone supported 5G connectivity." },
-  { title: "European affairs", tag: "Society", text: "The European Union has 27 member countries. Norway is a member of the European Union." }
+  { title: "Investigate a known fact", tag: "Astronomy", text: "Jupiter is the largest planet in our Solar System." },
+  { title: "Challenge a common misconception", tag: "Planetary science", text: "Mars is the biggest planet in the Solar System." },
+  { title: "Explore a contextual claim", tag: "Geography", text: "The Sahara is the largest desert on Earth." }
 ];
 
 function reportMarkdown(report: Report, original: string) {
