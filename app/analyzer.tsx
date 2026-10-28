@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
+import ReportComparison from "./report-comparison";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
@@ -360,6 +361,7 @@ export default function Analyzer() {
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
           <EvidenceCoverageBoard claims={report.claims} />
+          <ReportComparison key={completedAt || submittedContent} current={report} completedAt={completedAt}/>
           <div className="report-list">
             {report.claims.map((claim, index) => <article className="claim-card" key={index} id={"claim-" + (index + 1)}>
               <div className="claim-card-head"><span className="claim-index">CLAIM {String(index + 1).padStart(2, "0")}</span><span className={"verdict verdict-" + claim.verdict}>{verdicts[claim.verdict].label}</span></div>
