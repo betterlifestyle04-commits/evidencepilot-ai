@@ -42,3 +42,13 @@ A full V2 three-claim investigation typically makes **8 Nemotron calls** (extrac
 `app/analyzer.tsx` is the client UI. `app/api/analyze/route.ts` is the server-only orchestration endpoint. `lib/providers.ts` makes the real Nebius and Tavily calls with request timeouts and a structured-output fallback. `lib/evidence.ts` validates model output and ensures rendered citations originate from Tavily results. `scripts/verify-providers.ts` validates the live model catalog, JSON capability, and Tavily response without exposing credentials.
 
 Read [the V2 evidence methodology](docs/evidence-methodology-v2.md) for the bounded investigation design, qualitative source handling, live evaluation suite, and limitations.
+
+## Quick Check and Deep Investigation
+
+The UI offers two actual server-side workflows:
+- **Quick Check (default):** extract up to 3 claims, run one basic Tavily search per claim, assess using Nemotron, and rewrite cautiously. For a full 3-claim run, normally 5 Nemotron calls and 3 Tavily calls.
+- **Deep Investigation:** plan each claim with Nemotron, run advanced Tavily searches, and optionally conduct one targeted follow-up per claim when evidence is weak. For 3 claims, normally 8 Nemotron calls and 3–6 Tavily calls.
+
+Both modes use the same citation validation, uncertainty and Upstash rate limiting. The API returns its actual mode. Without a mode, the API defaults to Quick Check. Neither mode fabricates results.
+
+Live Vercel latency for each mode needs verification before relying on it for demonstrations.
