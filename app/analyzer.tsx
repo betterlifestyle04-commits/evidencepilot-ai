@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
+import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
@@ -95,6 +96,7 @@ export default function Analyzer() {
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [mode, setMode] = useState<AnalysisMode>("quick");
   const [submittedContent, setSubmittedContent] = useState("");
+  const [importedReport, setImportedReport] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [expandedGuide, setExpandedGuide] = useState(false);
@@ -104,6 +106,10 @@ export default function Analyzer() {
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
+
+  useEffect(() => {
+    if (report) document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [report]);
 
   useEffect(() => {
     if (!busy) return;
@@ -128,9 +134,35 @@ export default function Analyzer() {
     document.getElementById("content")?.focus();
   }
 
+  async function openSavedReport(file: File | undefined) {
+    if (!file) return;
+    if (!/\.json$/i.test(file.name) || file.size > 250_000) {
+      setError("Choose an EvidencePilot JSON report smaller than 250 KB.");
+      return;
+    }
+    try {
+      const saved = parseSavedReport(await file.text());
+      setBusy(false);
+      setContent(saved.original);
+      setSubmittedContent(saved.original);
+      setReport(saved.report);
+      setReviewedUrls(saved.reviewedUrls);
+      setSourceNotes(saved.sourceNotes);
+      setCompletedAt(saved.completedAt);
+      setMode(saved.report.mode || "quick");
+      setImportedReport(true);
+      setError("");
+      setNotice("Saved report reopened locally. No new AI analysis or web search was performed.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to open the saved report.");
+      setNotice("");
+    }
+  }
+
   async function importTextFile(file: File | undefined) {
     if (!file) return;
     setReport(null);
+    setImportedReport(false);
     setError("");
     setNotice("");
     if (!/\.(txt|md)$/i.test(file.name)) {
@@ -158,6 +190,7 @@ export default function Analyzer() {
   async function analyze() {
     if (!canAnalyze) return;
     setBusy(true);
+    setImportedReport(false);
     setElapsedSeconds(0);
     setError("");
     setNotice("");
@@ -186,7 +219,6 @@ export default function Analyzer() {
       setCompletedAt(new Date().toISOString());
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
-      window.requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to analyze this content right now.");
     } finally {
@@ -205,7 +237,7 @@ export default function Analyzer() {
 
   function downloadJson() {
     if (!report) return;
-    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, sourceNotes, note: "Reader-marked only; not independent verification." } };
+    const exportData = { product: "EvidencePilot", schemaVersion: 1, exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, sourceNotes, note: "Reader-marked only; not independent verification." } };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -270,6 +302,12 @@ export default function Analyzer() {
             />
             <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
+            <div className="saved-report-import">
+              <label className="import-file import-report">↗ Reopen saved report (.json)
+                <input type="file" accept=".json,application/json" aria-label="Reopen a previously exported EvidencePilot JSON report" onChange={(event) => { void openSavedReport(event.target.files?.[0]); event.target.value = ""; }} disabled={busy}/>
+              </label>
+              <p>Reopen a previously exported investigation, including your notes and review checklist. This happens entirely in your browser and uses no AI credits.</p>
+            </div>
             <div className="mode-selector" role="group" aria-label="Choose investigation depth">
               <button type="button" aria-pressed={mode === "quick"} className={"mode-option" + (mode === "quick" ? " selected" : "")} onClick={() => { setMode("quick"); setReport(null); }} disabled={busy}>
                 <span className="mode-title">Quick Check</span>
@@ -316,7 +354,8 @@ export default function Analyzer() {
 
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
-          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
