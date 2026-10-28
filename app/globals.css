@@ -76,3 +76,6 @@
 .busy-duration{font-weight:800;color:#226344}
 @media(max-width:620px){.source-review-workspace{padding:17px}.source-review-heading{flex-direction:column}.source-review-progress{width:100%;text-align:left;grid-template-columns:auto 1fr;align-items:center}.source-review-entry{grid-template-columns:25px 1fr}.review-check{grid-column:2}.source-review-stats{gap:8px}}
 @media print{.source-review-workspace{break-inside:avoid}.review-check input{appearance:none}.review-check input:checked::before{content:"✓"}}
+
+.report-completed-at{color:#397153!important;font-size:11px!important;font-weight:700;margin-top:7px!important}
+.time-sensitive-warning{background:#fff9e9;color:#725722;border:1px solid #ead9ab;border-radius:10px;padding:13px 16px;font-size:12px;line-height:1.7;margin:12px 0 18px}

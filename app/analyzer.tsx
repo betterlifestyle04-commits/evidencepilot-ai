@@ -22,11 +22,12 @@ const examples = [
   { title: "Explore a contextual claim", tag: "Geography", text: "The Sahara is the largest desert on Earth." }
 ];
 
-function reportMarkdown(report: Report, original: string, reviewedUrls: string[]) {
+function reportMarkdown(report: Report, original: string, reviewedUrls: string[], completedAt: string | null) {
   const lines: string[] = [
     "# EvidencePilot evidence report",
     "",
     "This is AI-assisted research. Sources must be reviewed independently.",
+    ...(completedAt ? ["Analysis completed (UTC): " + completedAt] : []),
     "",
     "## Original submitted text",
     "",
@@ -87,6 +88,7 @@ export default function Analyzer() {
   const [busy, setBusy] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewedUrls, setReviewedUrls] = useState<string[]>([]);
+  const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [mode, setMode] = useState<AnalysisMode>("quick");
   const [submittedContent, setSubmittedContent] = useState("");
   const [error, setError] = useState("");
@@ -95,7 +97,7 @@ export default function Analyzer() {
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
-  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls) : "";
+  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
@@ -172,6 +174,7 @@ export default function Analyzer() {
       }
       setSubmittedContent(submitted);
       setReviewedUrls([]);
+      setCompletedAt(new Date().toISOString());
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
       window.requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -193,7 +196,7 @@ export default function Analyzer() {
 
   function downloadJson() {
     if (!report) return;
-    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), original: submittedContent, report, manualSourceReview: { reviewedUrls, note: "Reader-marked only; not independent verification." } };
+    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, note: "Reader-marked only; not independent verification." } };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -304,8 +307,9 @@ export default function Analyzer() {
 
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
-          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p></div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
+          {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
           <div className="report-list">
             {report.claims.map((claim, index) => <article className="claim-card" key={index}>
