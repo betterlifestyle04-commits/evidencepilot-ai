@@ -75,3 +75,27 @@ test("deep mode creates a plan and uses advanced search", async () => {
   assert.equal(report.mode, "deep");
   assert.equal(report.providerCalls.nebius, 4);
 });
+test("returns a partial report when one assessment fails", async () => {
+  const report = await analyzeContent("Claim input", {
+    extractClaims: async () => ["First claim.", "Second claim."],
+    planClaim: async claim => ({ ...plan(claim), queries: [claim + " sources"] }),
+    searchClaim: async () => [{ title: "Record", url: "https://example.org/record", content: "Evidence" }],
+    assess: async claim => { if (claim.startsWith("Second")) throw new Error("temporary failure"); return { claim, verdict: "supported", explanation: "Evidence supports it.", sourceIndices: [0] }; },
+    cautiousRewrite: async () => "Careful rewrite."
+  });
+  assert.equal(report.claims[0].verdict, "supported");
+  assert.equal(report.claims[1].retrievalStatus, "assessment_unavailable");
+  assert.equal(report.claims[1].verdict, "insufficient_evidence");
+});
+test("returns original text when the optional rewrite service fails", async () => {
+  const input = "A factual statement that needs review.";
+  const report = await analyzeContent(input, {
+    extractClaims: async () => ["A factual statement that needs review."],
+    planClaim: async claim => ({ ...plan(claim), queries: [claim + " sources"] }),
+    searchClaim: async () => [{ title: "Record", url: "https://example.org/record", content: "Evidence" }],
+    assess: async claim => ({ claim, verdict: "supported", explanation: "Evidence supports it.", sourceIndices: [0] }),
+    cautiousRewrite: async () => { throw new Error("temporary failure"); }
+  });
+  assert.equal(report.rewrite, input);
+  assert.equal(report.investigation.rewriteStatus, "unavailable");
+});
