@@ -56,9 +56,14 @@ export function validateAssessment(value: unknown, sources: SearchResult[]): Ass
   const validVerdicts: Verdict[] = ["supported", "contradicted", "mixed", "insufficient_evidence"];
   if (typeof input.claim !== "string" || !validVerdicts.includes(input.verdict as Verdict) || typeof input.explanation !== "string" || !Array.isArray(input.sourceIndices)) throw new Error("Nemotron assessment is incomplete.");
   const sourceIndices = [...new Set(input.sourceIndices.filter((index): index is number => Number.isInteger(index) && index >= 0 && index < sources.length && isSafeSourceUrl(sources[index].url)))].slice(0, 4);
-  const verdict: Verdict = input.verdict === "supported" && sourceIndices.length === 0 ? "insufficient_evidence" : input.verdict as Verdict;
+  // No cited retrieved evidence can substantiate a decisive verdict.
+  // This includes contradiction and mixed-evidence claims, not only support.
+  const verdict: Verdict = sourceIndices.length === 0 ? "insufficient_evidence" : input.verdict as Verdict;
   const strengths = ["strong","moderate","limited","insufficient"] as const;
-  const evidenceStrength = strengths.includes(input.evidenceStrength as typeof strengths[number]) ? input.evidenceStrength as typeof strengths[number] : verdict === "insufficient_evidence" ? "insufficient" : "limited";
+  const rawStrength = strengths.includes(input.evidenceStrength as typeof strengths[number])
+    ? input.evidenceStrength as typeof strengths[number] : "limited";
+  // Never display "strong evidence" beside a downgraded/unknown verdict.
+  const evidenceStrength = verdict === "insufficient_evidence" ? "insufficient" : rawStrength;
   const sourceAssessments = Array.isArray(input.sourceAssessments) ? input.sourceAssessments.filter((item): item is SourceAssessment => Boolean(item && typeof item === "object" && Number.isInteger((item as SourceAssessment).index) && sourceIndices.includes((item as SourceAssessment).index) && ["supports","contradicts","context","inconclusive"].includes((item as SourceAssessment).relationship) && typeof (item as SourceAssessment).relevance === "string" && typeof (item as SourceAssessment).limitations === "string")).slice(0, 4).map(item=>({...item,relevance:item.relevance.slice(0,300),limitations:item.limitations.slice(0,300)})) : [];
   return { claim: input.claim.trim().slice(0, 400), verdict, explanation: input.explanation.trim().slice(0, 1200), sourceIndices, evidenceStrength, qualifications: typeof input.qualifications === "string" ? input.qualifications.slice(0,600) : undefined, sourceAssessments };
 }

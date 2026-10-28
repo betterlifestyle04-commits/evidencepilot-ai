@@ -23,3 +23,16 @@ test("prefers direct relevance even when a nominally official result is off-topi
   ],"The first iPhone was released in 2007");
   assert.equal(ranked[0].url,"https://example.org/iphone-history");
 });
+
+test("downgrades uncited contradiction and mixed verdicts with consistent strength",()=>{
+  for (const proposed of ["contradicted","mixed"] as const) {
+    const assessment=validateAssessment({claim:"An unsupported statement.",verdict:proposed,explanation:"No direct evidence provided.",sourceIndices:[],evidenceStrength:"strong"},[]);
+    assert.equal(assessment.verdict,"insufficient_evidence");
+    assert.equal(assessment.evidenceStrength,"insufficient");
+  }
+});
+test("downgrades a supported verdict with invalid citations to insufficient strength",()=>{
+  const assessment=validateAssessment({claim:"A claim",verdict:"supported",explanation:"A claim is supported",sourceIndices:[0],evidenceStrength:"strong"},[{url:"http://localhost/private",content:"Local source"}]);
+  assert.equal(assessment.verdict,"insufficient_evidence");
+  assert.equal(assessment.evidenceStrength,"insufficient");
+});
