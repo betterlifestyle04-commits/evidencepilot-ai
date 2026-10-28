@@ -6,3 +6,33 @@ test("investigates claims with bounded plans and grounded citations",async()=>{c
 test("uses one follow-up search only when initial evidence is weak",async()=>{const queries:string[]=[];const report=await analyzeContent("Input",{extractClaims:async()=>["A claim."],planClaim:async claim=>plan(claim),searchClaim:async query=>{queries.push(query);return query.endsWith("science")?[{title:"Post",url:"https://example.com/blog",content:"Opinion"}]:[{title:"NASA",url:"https://nasa.gov/data",content:"Direct record"}]},assess:async claim=>({claim,verdict:"supported",explanation:"Supported.",sourceIndices:[1]}),cautiousRewrite:async()=>"Rewrite"});assert.equal(queries.length,2);assert.equal(report.providerCalls.tavily,2);});
 test("marks unavailable retrieval as insufficient without aborting",async()=>{const report=await analyzeContent("Input",{extractClaims:async()=>["Unavailable claim."],planClaim:async claim=>plan(claim),searchClaim:async()=>{throw new Error("timeout")},assess:async()=>{throw new Error("must not run")},cautiousRewrite:async()=>"Careful rewrite."});assert.equal(report.claims[0].retrievalStatus,"unavailable");assert.equal(report.claims[0].verdict,"insufficient_evidence");});
 test("deduplicates repeated targeted queries within one investigation",async()=>{let searches=0;const report=await analyzeContent("Input",{extractClaims:async()=>["First claim.","Second claim."],planClaim:async claim=>({...plan(claim),queries:["shared authoritative query"]}),searchClaim:async()=>{searches++;return [{title:"Source",url:"https://nasa.gov/source",content:"Direct material"}]},assess:async claim=>({claim,verdict:"supported",explanation:"Supported.",sourceIndices:[0]}),cautiousRewrite:async()=>"Rewrite"});assert.equal(searches,1);assert.equal(report.providerCalls.tavily,1);assert.equal(report.investigation.uniqueSearches,1);assert.equal(report.investigation.followupSearches,0);});
+
+test("investigates independent claims concurrently while preserving their order",async()=>{
+  let started = 0;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const analysis = analyzeContent("Input",{
+    extractClaims: async()=>["First independent claim.","Second independent claim."],
+    planClaim: async claim=>({...plan(claim),queries:[claim + " relevant sources"]}),
+    searchClaim: async()=>{started++;await gate;return [{title:"Record",url:"https://example.org/record",content:"Published evidence."}]},
+    assess: async claim=>({claim,verdict:"supported",explanation:"Retrieved supporting material.",sourceIndices:[0]}),
+    cautiousRewrite: async()=> "Rewritten cautiously."
+  });
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(started,2,"both first searches should have started before either resolves");
+  release();
+  const result=await analysis;
+  assert.deepEqual(result.claims.map(claim=>claim.claim),["First independent claim.","Second independent claim."]);
+});
+test("preserves initial sources if an optional follow-up search fails",async()=>{
+  const report=await analyzeContent("Input",{
+    extractClaims:async()=>["A factual claim for checking."],
+    planClaim:async claim=>plan(claim),
+    searchClaim:async query=>{if(query.endsWith("primary source"))throw new Error("optional search timeout");return [{title:"Relevant record",url:"https://example.org/a",content:"Evidence"}]},
+    assess:async claim=>({claim,verdict:"supported",explanation:"Evidence supports it.",sourceIndices:[0]}),
+    cautiousRewrite:async()=>"A careful statement."
+  });
+  assert.equal(report.claims[0].sources.length,1);
+  assert.equal(report.claims[0].retrievalStatus,undefined);
+  assert.equal(report.providerCalls.tavily,2);
+});
