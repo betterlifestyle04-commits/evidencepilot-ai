@@ -4,7 +4,7 @@
 
 `npm test`, `npm run lint`, and `npm run build` run without provider credentials. The API route targets the Node.js runtime and exports `maxDuration = 60`, which is suitable for Vercel plans that allow a 60-second function duration.
 
-`GET /api/health` is a non-cached, non-secret readiness endpoint. It reports only whether provider and shared-rate-limit bindings are present; it never validates keys or reveals values. Do not treat its `integrations: "unverified"` response as proof that providers work.
+`GET /api/health` is a non-cached, non-secret readiness endpoint. It reports `ready` only when provider and shared-rate-limit bindings are present, otherwise `degraded`; it never validates keys or reveals values. Do not treat its `integrations: "unverified"` response as proof that providers work. Every analysis response includes a random `requestId` and matching `X-Request-Id` header for support correlation, without logging or exposing provider details.
 
 ## Required production configuration
 
