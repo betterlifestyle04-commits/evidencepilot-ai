@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
+import EvidenceCoverageBoard from "./evidence-coverage-board";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
@@ -311,8 +312,9 @@ export default function Analyzer() {
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
+          <EvidenceCoverageBoard claims={report.claims} />
           <div className="report-list">
-            {report.claims.map((claim, index) => <article className="claim-card" key={index}>
+            {report.claims.map((claim, index) => <article className="claim-card" key={index} id={"claim-" + (index + 1)}>
               <div className="claim-card-head"><span className="claim-index">CLAIM {String(index + 1).padStart(2, "0")}</span><span className={"verdict verdict-" + claim.verdict}>{verdicts[claim.verdict].label}</span></div>
               <h3>{claim.claim}</h3><ResearchReasoning claim={claim} /><div className="assessment-label">ASSESSMENT</div><GroundedExplanation text={claim.explanation} sources={claim.sources} claimNumber={index + 1} />
               <div className="source-list"><div className="source-title"><span>RETRIEVED SOURCES</span><span>{claim.sources.length} cited</span></div>
