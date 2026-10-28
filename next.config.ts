@@ -1,3 +1,3 @@
 import type { NextConfig } from "next";
-const nextConfig: NextConfig = { reactStrictMode: true };
+const nextConfig: NextConfig = { reactStrictMode: true, async headers() { return [{ source: "/api/:path*", headers: [{ key: "X-Content-Type-Options", value: "nosniff" }, { key: "Cache-Control", value: "no-store" }] }]; } };
 export default nextConfig;
