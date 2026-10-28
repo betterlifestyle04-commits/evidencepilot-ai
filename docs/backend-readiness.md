@@ -24,6 +24,6 @@ After securely binding credentials, run `npm run verify:providers`. It checks th
 
 ## Operational limits
 
-A normal three-claim report uses eight provider calls: five Nemotron and three Tavily. A Nebius `response_format` rejection triggers one JSON-only retry for that particular model call. A failed Tavily request is represented as an insufficient-evidence claim rather than destroying unrelated completed claims. Provider errors returned to the browser are sanitized; keys and upstream response bodies are never returned or logged.
+A normal three-claim report with usable evidence uses eight provider calls: five Nemotron and three Tavily. A Nebius `response_format` rejection triggers one JSON-only retry for that particular model call. A failed Tavily request is represented as an insufficient-evidence claim rather than destroying unrelated completed claims. If Tavily returns no usable public sources, the assessment call is skipped to save credits and the claim is marked insufficient evidence. Provider errors returned to the browser are sanitized; keys and upstream response bodies are never returned or logged.
 
 Requests must be JSON, have a declared body at or below 16 KB, and receive `no-store`/`nosniff` API response headers. Tavily results are deduplicated and only public HTTPS URLs are allowed through to assessment and rendering; local, credential-bearing, insecure, and malformed URLs are discarded.
