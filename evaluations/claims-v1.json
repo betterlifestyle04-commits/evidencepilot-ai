@@ -1,0 +1,12 @@
+[
+  {"id":"science-true","claim":"Earth orbits the Sun.","expectedVerdict":"supported","reference":"https://science.nasa.gov/solar-system/"},
+  {"id":"science-false","claim":"Mars is the biggest planet in the Solar System.","expectedVerdict":"contradicted","reference":"https://science.nasa.gov/mars/facts/"},
+  {"id":"history-true","claim":"Apollo 11 landed humans on the Moon in 1969.","expectedVerdict":"supported","reference":"https://www.nasa.gov/mission/apollo-11/"},
+  {"id":"technology-false","claim":"The original iPhone supported 5G connectivity.","expectedVerdict":"contradicted","reference":"https://www.apple.com/newsroom/2007/01/09Apple-Reinvents-the-Phone-with-iPhone/"},
+  {"id":"history-date","claim":"The United States purchased Alaska from Russia in 1867.","expectedVerdict":"supported","reference":"https://www.archives.gov/milestone-documents/treaty-with-russia"},
+  {"id":"health-mixed","claim":"Vitamin C prevents the common cold for everyone.","expectedVerdict":"mixed","reference":"https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD000980.pub4/full"},
+  {"id":"insufficient","claim":"The exact location of Atlantis has been conclusively established.","expectedVerdict":"insufficient_evidence","reference":"https://www.britannica.com/topic/Atlantis-legendary-island"},
+  {"id":"politics-false","claim":"Norway is a member state of the European Union.","expectedVerdict":"contradicted","reference":"https://european-union.europa.eu/principles-countries-history/country-profiles/norway_en"},
+  {"id":"statistics-context","claim":"The global population is exactly 8 billion people today.","expectedVerdict":"mixed","reference":"https://www.un.org/development/desa/pd/content/world-population-prospects-2024"},
+  {"id":"economics-time-sensitive","claim":"The United States inflation rate is 2 percent.","expectedVerdict":"insufficient_evidence","reference":"https://www.bls.gov/cpi/"}
+]
