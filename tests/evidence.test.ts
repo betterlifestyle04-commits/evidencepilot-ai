@@ -46,3 +46,20 @@ test("retains original catalog indices for source-to-explanation linking",()=>{
   const selected=sourcesFor([2,0],sources);
   assert.deepEqual(selected.map(source=>source.sourceIndex),[2,0]);
 });
+
+test("rejects supported verdicts that cite only inconclusive context",()=>{
+  const sources=[{title:"Context",url:"https://example.org/context",content:"General background information"}];
+  const item=validateAssessment({claim:"A checkable statement",verdict:"supported",explanation:"Generic context",sourceIndices:[0],evidenceStrength:"strong",sourceAssessments:[{index:0,relationship:"context",relevance:"General topic",limitations:"Does not substantiate claim"}]},sources);
+  assert.equal(item.verdict,"insufficient_evidence");
+  assert.equal(item.evidenceStrength,"insufficient");
+});
+test("requires at least one supporting and opposing relationship for a mixed verdict",()=>{
+  const sources=[{title:"Opposing only",url:"https://example.org/negative",content:"Contradictory material"}];
+  const item=validateAssessment({claim:"A checkable statement",verdict:"mixed",explanation:"Model said mixed",sourceIndices:[0],sourceAssessments:[{index:0,relationship:"contradicts",relevance:"Opposing",limitations:"No supporting source"}]},sources);
+  assert.equal(item.verdict,"insufficient_evidence");
+});
+test("keeps directly supported verdicts with aligned cited relationships",()=>{
+  const sources=[{title:"Direct",url:"https://example.org/primary",content:"Direct evidence"}];
+  const item=validateAssessment({claim:"A checkable statement",verdict:"supported",explanation:"The source supports it",sourceIndices:[0],sourceAssessments:[{index:0,relationship:"supports",relevance:"Direct",limitations:"Excerpt only"}]},sources);
+  assert.equal(item.verdict,"supported");
+});
