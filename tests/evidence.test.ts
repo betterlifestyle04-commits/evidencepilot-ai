@@ -6,3 +6,20 @@ test("accepts a fenced compatible JSON fallback",()=>assert.equal(parseJsonObjec
 test("never permits supported without a cited retrieved URL",()=>{const sources=[{title:"Good",url:"https://example.com",content:"Excerpt"},{title:"Bad",url:"javascript:alert(1)",content:"No"}];const assessment=validateAssessment({claim:"A claim long enough",verdict:"supported",explanation:"The result supports it.",sourceIndices:[1]},sources);assert.equal(assessment.verdict,"insufficient_evidence");assert.equal(sourcesFor(assessment.sourceIndices,sources).length,0);});
 test("removes duplicate and unsafe retrieved URLs before assessment",()=>{const results=sanitizeSearchResults([{url:"https://example.com/a",title:"A"},{url:"https://example.com/a?tracking=1",title:"Duplicate"},{url:"http://example.org",title:"Insecure"},{url:"https://localhost/internal",title:"Local"},{url:"https://example.net/evidence",title:"Valid"}]);assert.deepEqual(results.map(result=>result.url),["https://example.com/a","https://example.net/evidence"]);});
 test("orders equally relevant primary material before social commentary",()=>{const ranked=rankSearchResults([{title:"Mars is the fourth planet",url:"https://instagram.com/p/mars",content:"Mars facts"},{title:"Mars is the fourth planet",url:"https://science.nasa.gov/mars/",content:"Mars facts"}],"Mars is the biggest planet");assert.equal(ranked[0].url,"https://science.nasa.gov/mars/");});
+
+test("ranks a relevant primary source ahead of a repetitive social post",()=>{
+  const ranked = rankSearchResults([
+    {title:"Mars is the biggest planet",url:"https://www.instagram.com/p/123",content:"Mars is the biggest planet in the Solar System"},
+    {title:"Mars overview from NASA",url:"https://science.nasa.gov/mars/",content:"Mars is smaller than Jupiter and is the fourth planet from the Sun."},
+    {title:"Unrelated official overview",url:"https://science.nasa.gov/galaxies/",content:"A view of distant stars"}
+  ],"Mars is the biggest planet");
+  assert.equal(ranked[0].url,"https://science.nasa.gov/mars/");
+  assert.equal(ranked[ranked.length-1].url,"https://science.nasa.gov/galaxies/");
+});
+test("prefers direct relevance even when a nominally official result is off-topic",()=>{
+  const ranked=rankSearchResults([
+    {title:"Unrelated agency report",url:"https://example.gov/finance",content:"A financial filing"},
+    {title:"The first iPhone was released in 2007",url:"https://example.org/iphone-history",content:"The first iPhone arrived in 2007."}
+  ],"The first iPhone was released in 2007");
+  assert.equal(ranked[0].url,"https://example.org/iphone-history");
+});

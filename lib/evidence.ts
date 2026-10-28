@@ -17,7 +17,28 @@ export function sanitizeSearchResults(results: SearchResult[], limit = 8): Searc
     return true;
   }).slice(0, limit);
 }
-export function rankSearchResults(results:SearchResult[], claim:string):SearchResult[]{const terms=claim.toLowerCase().match(/[a-z0-9]{4,}/g)||[];const categoryWeight:Record<SourceType,number>={primary:4,academic:3,established_reporting:2,unknown:1,commentary:0,social_media:-1};return [...results].sort((a,b)=>{const relevance=(source:SearchResult)=>terms.reduce((total,term)=>total+((`${source.title||""} ${source.content||""}`).toLowerCase().includes(term)?1:0),0);const difference=(relevance(b)*5+categoryWeight[categorizeSource(b)])-(relevance(a)*5+categoryWeight[categorizeSource(a)]);return difference||String(a.title||"").localeCompare(String(b.title||""));});}
+/**
+ * Heuristic retrieval ordering: relevance is necessary, authority adds context.
+ * A trusted domain never earns a high ranking if its result is unrelated.
+ * This ranking does NOT assert that a claim is true or a source is trustworthy.
+ */
+export function rankSearchResults(results: SearchResult[], claim: string): SearchResult[] {
+  const stopWords = new Set(["that", "this", "with", "from", "were", "have", "been", "their", "there", "which", "largest", "biggest"]);
+  const terms = [...new Set((claim.toLowerCase().match(/[a-z0-9]{4,}/g) || []).filter(term => !stopWords.has(term)))];
+  const categoryWeight: Record<SourceType, number> = {
+    primary: 11, academic: 9, established_reporting: 5, unknown: 1, commentary: -2, social_media: -5
+  };
+  const score = (source: SearchResult) => {
+    const title = String(source.title || "").toLowerCase();
+    const excerpt = String(source.content || "").toLowerCase();
+    const titleMatches = terms.filter(term => title.includes(term)).length;
+    const excerptMatches = terms.filter(term => excerpt.includes(term)).length;
+    const relevance = titleMatches * 3 + excerptMatches;
+    // A generic official page should not outrank a highly relevant result.
+    return relevance === 0 ? -100 : relevance * 2 + categoryWeight[categorizeSource(source)];
+  };
+  return [...results].sort((a,b) => score(b) - score(a) || String(a.title || "").localeCompare(String(b.title || "")));
+}
 
 export function parseJsonObject(raw: string): Record<string, unknown> {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");

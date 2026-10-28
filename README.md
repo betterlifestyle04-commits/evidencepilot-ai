@@ -35,7 +35,7 @@ npm run evaluate:live # optional live 10-case evaluation; consumes provider cred
 
 Deploy to Vercel by importing this repository, setting `NEBIUS_API_KEY`, `TAVILY_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, and optionally `NEBIUS_MODEL` in Project Settings → Environment Variables, then deploy. Keep all keys server-side; never use `NEXT_PUBLIC_` for them. Set Vercel's function duration to at least 60 seconds (the route exports `maxDuration = 60`).
 
-Each normal three-claim analysis makes **8 provider calls**: 5 Nemotron calls (claim extraction, 3 assessments, rewrite) and 3 Tavily calls. If the OpenAI-compatible `response_format` is rejected, a Nemotron call is retried with an explicit JSON-only fallback; that failed attempt adds one call. Production requires an Upstash Redis REST binding and enforces a shared limit of 3 analyses/minute/IP. Local development uses an in-memory equivalent. This protects the public demo from unbounded provider spend.
+A full V2 three-claim investigation typically makes **8 Nemotron calls** (extraction, three research plans, three assessments, rewrite) and **3–6 Tavily calls** (one targeted search per claim, plus at most one conditional follow-up each). An optional structured-output fallback can add a model request. Configure `MAX_SEARCHES_PER_CLAIM=1` to disable follow-up searches for cost/latency-sensitive demos. Calls can be fewer when searches are deduplicated or evidence is unavailable. Production requires an Upstash Redis REST binding and enforces a shared limit of 3 analyses/minute/IP. Local development uses an in-memory equivalent. This protects the public demo from unbounded provider spend.
 
 ## Architecture
 
