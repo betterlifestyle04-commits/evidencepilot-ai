@@ -70,6 +70,33 @@ export default function Analyzer() {
     document.getElementById("content")?.focus();
   }
 
+  async function importTextFile(file: File | undefined) {
+    if (!file) return;
+    setReport(null);
+    setError("");
+    setNotice("");
+    if (!/\.(txt|md)$/i.test(file.name)) {
+      setError("Please select a .txt or .md document. Other file types are not supported yet.");
+      return;
+    }
+    if (file.size > 60_000) {
+      setError("The file is too large for this demo. Import a short excerpt instead.");
+      return;
+    }
+    try {
+      const text = (await file.text()).replace(/^\uFEFF/, "");
+      if (text.length > 12_000) {
+        setError("This file exceeds the 12,000-character limit. Shorten it before importing.");
+        return;
+      }
+      setContent(text);
+      setNotice("Document imported locally. No text is transmitted until you select Analyze.");
+      document.getElementById("content")?.focus();
+    } catch {
+      setError("We could not read this file. Please paste the text manually.");
+    }
+  }
+
   async function analyze() {
     if (!canAnalyze) return;
     setBusy(true);
@@ -157,14 +184,16 @@ export default function Analyzer() {
               id="content"
               value={content}
               onChange={(event) => { setContent(event.target.value); setError(""); }}
+              onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); if (canAnalyze) void analyze(); } }}
               maxLength={12000}
               disabled={busy}
               placeholder="Paste something worth checking...&#10;&#10;Example: The first iPhone was introduced in 2007. The original iPhone supported 5G connectivity."
               aria-describedby="text-guidance"
             />
             <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
+            <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
             <div className="input-divider" />
-            <div className="form-bottom"><div><strong>Three claims per analysis</strong><span>AI-assisted, never a substitute for checking original sources.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>Analyze evidence <span aria-hidden="true">↗</span></>}</button></div>
+            <div className="form-bottom"><div><strong>Three claims per analysis</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>Analyze evidence <span aria-hidden="true">↗</span></>}</button></div>
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Consulting Nemotron and researching sources with Tavily. This may take a little time.</div>}
             {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span></div>}
           </div>
