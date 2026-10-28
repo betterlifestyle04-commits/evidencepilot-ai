@@ -1,0 +1,2 @@
+import Analyzer from "./analyzer";
+export default function Home() { return <main><header><a className="brand" href="/">Evidence<span>Pilot</span></a><p>AI-assisted evidence review</p></header><Analyzer/><footer>EvidencePilot uses <strong>NVIDIA Nemotron via Nebius Token Factory</strong> to reason over live results from <strong>Tavily Search</strong>. Always open and assess sources yourself.</footer></main>; }
