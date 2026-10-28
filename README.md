@@ -7,7 +7,7 @@ An evidence-first fact-checking web app for the Nebius × NVIDIA Global AI Hacka
 1. The browser sends pasted content to the server API; no API keys reach the client.
 2. An NVIDIA Nemotron model, served through [Nebius Token Factory](https://api.tokenfactory.nebius.com/v1/)'s OpenAI-compatible API, extracts up to three independently verifiable claims.
 3. The server calls [Tavily Search](https://tavily.com/) for each claim.
-4. Nemotron creates a bounded research plan, searches for relevant evidence (with at most one follow-up per claim), and assesses the supplied Tavily result set as `supported`, `contradicted`, `mixed`, or `insufficient_evidence`.
+4. Deep Investigation creates a Nemotron research plan and may run a second Tavily search for weak evidence; Quick Check skips planning and follow-up. Both assess claims as `supported`, `contradicted`, `mixed`, or `insufficient_evidence`.
 5. EvidencePilot maps citations from model-selected result indices back to Tavily-returned URLs. The model cannot fabricate a displayed URL. A `supported` verdict requires at least one cited retrieved result; otherwise it is downgraded to insufficient evidence. It also produces a careful rewrite that removes or qualifies unsupported statements.
 
 The UI labels URLs as **Retrieved sources**, not verified sources. It shows source excerpts, clickable URLs, uncertainty, and Markdown export. Retrieved web content is treated as untrusted data, never as instructions. Treat it as research assistance—not final editorial, legal, medical, or scientific judgment.

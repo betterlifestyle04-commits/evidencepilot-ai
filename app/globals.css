@@ -41,3 +41,15 @@
 .mode-option.selected .mode-title::before{content:"● ";color:#28734d}.result-stale-note{font-size:12px;border:1px solid #e7d3a0;background:#fff9e7;border-radius:10px;padding:12px 14px;color:#765c1e;margin:14px 0}
 @media(max-width:560px){.mode-selector{grid-template-columns:1fr}.mode-option{padding:13px}.mode-option.selected{padding:12px}}
 @media print{.mode-selector,.result-stale-note{display:none!important}}
+
+/* Explain the two actual research workflows to users and judges */
+.mode-explainer{margin:0 0 50px}.mode-explainer>h2{font:800 clamp(26px,3vw,35px)/1.3 Manrope,sans-serif;letter-spacing:-.045em;margin:13px 0}
+.mode-explainer>p{font-size:14px;line-height:1.8;color:#68786d;max-width:850px}
+.mode-explainer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:25px 0 15px}
+.mode-explainer-card{background:#fff;border:1px solid #d8e5db;border-radius:17px;padding:26px}
+.mode-explainer-card:last-child{background:#eaf5ed;border-color:#c4dfcd}
+.mode-explainer-label{font-size:10px;font-weight:800;letter-spacing:.12em;color:#317450}
+.mode-explainer-card h3{font:800 22px/1.4 Manrope,sans-serif;letter-spacing:-.045em;margin:11px 0}
+.mode-explainer-card p{font-size:13px;line-height:1.8;color:#597063}.mode-explainer-card strong,.mode-explainer-card>span:last-child{font-size:12px;line-height:1.8}
+.mode-explainer-footnote{font-size:12px!important;color:#73887b!important}
+@media(max-width:680px){.mode-explainer-grid{grid-template-columns:1fr}.mode-explainer-card{padding:21px}}
