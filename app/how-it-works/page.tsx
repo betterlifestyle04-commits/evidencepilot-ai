@@ -11,6 +11,7 @@ const questions = [
   { question: "Does a 'supported' verdict guarantee a claim is true?", answer: "No. It means the model found support within the retrieved material. Results may be incomplete, outdated, biased, or misinterpreted. Open the original sources and corroborate important conclusions." },
   { question: "Why do I see 'insufficient evidence'?", answer: "The available excerpts might not address the claim directly, or may not provide enough reliable detail to make a defensible judgment. Uncertainty is preferable to inventing a confident verdict." },
   { question: "Can I use this for medical, legal, or financial advice?", answer: "You can use it to organize preliminary research, but never as the sole basis for a consequential decision. Consult qualified professionals and primary sources for high-stakes questions." },
+  { question: "Can I reopen a report without another AI request?", answer: "Yes. Export your investigation as EvidencePilot JSON, then use Reopen saved report on the analyzer. The file is read locally without contacting Nemotron or Tavily. Old verdicts are not rechecked, and imported files are labelled as saved snapshots." },
   { question: "Does this page need an account?", answer: "No account is required. The public demo uses server-side AI credentials and rate limiting, and analysis may be unavailable if its usage limits are reached." }
 ];
 export default function HowItWorks() {
