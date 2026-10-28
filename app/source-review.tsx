@@ -22,11 +22,13 @@ export function uniqueCitedSources(claims: ClaimInsight[]): SourceItem[] {
 }
 
 export function SourceReviewDesk({
-  claims, reviewedUrls, onToggle
+  claims, reviewedUrls, onToggle, sourceNotes, onNoteChange
 }: {
   claims: ClaimInsight[];
   reviewedUrls: string[];
   onToggle: (url: string) => void;
+  sourceNotes: Record<string, string>;
+  onNoteChange: (url: string, text: string) => void;
 }) {
   const sources = uniqueCitedSources(claims);
   if (!sources.length) {
@@ -72,9 +74,17 @@ export function SourceReviewDesk({
             <input type="checkbox" checked={isReviewed} onChange={() => onToggle(source.url)} />
             <span>{isReviewed ? "Reviewed" : "Mark reviewed"}</span>
           </label>
+          <details className="review-source-notes">
+            <summary>{sourceNotes[source.url]?.trim() ? "Edit my research note" : "Add a research note"}</summary>
+            <label htmlFor={"research-note-" + index}>Your observation about this source (optional)</label>
+            <textarea id={"research-note-" + index} value={sourceNotes[source.url] || ""} maxLength={600} rows={2}
+              placeholder="What did the original page actually say? Any missing context or limitations?"
+              onChange={event => onNoteChange(source.url, event.target.value)} />
+            <small>{(sourceNotes[source.url] || "").length} / 600 characters · Kept in this browser session</small>
+          </details>
         </div>;
       })}
     </div>
-    <p className="source-review-warning">Review markers stay only in this browser session. Marking a source reviewed means you have personally inspected it; it does not mean the source or the AI verdict has been independently verified.</p>
+    <p className="source-review-warning">Review markers and notes remain only in this browser session until you export. They are not submitted to the AI providers. Marking a source reviewed does not mean the source or the AI verdict has been independently verified.</p>
   </section>;
 }
