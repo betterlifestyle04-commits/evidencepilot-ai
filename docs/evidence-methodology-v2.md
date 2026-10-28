@@ -11,6 +11,8 @@ input → claim extraction → per-claim research plan → targeted Tavily searc
 
 Each input produces no more than three claims. For each claim, Nemotron normalizes the claim, identifies its type, entities, time sensitivity, required evidence, and up to two targeted queries. EvidencePilot runs the second query only when the first search has fewer than two usable sources or contains only social/commentary/unknown source categories. `MAX_SEARCHES_PER_CLAIM` caps the budget at one or two searches (default two). There are no open-ended loops.
 
+Within one report, identical normalized Tavily queries are coalesced so they consume one search rather than duplicate API usage. The additive `investigation` response field reports elapsed duration, unique searches, follow-up searches, and claims with partial retrieval; it contains no input text, keys, or provider response bodies.
+
 ## Source handling
 
 Only public HTTPS URLs can be presented to the model or UI. Duplicate URLs, local addresses, credential-bearing URLs, and malformed URLs are discarded. The system labels sources as primary, academic, established reporting, commentary, social media, or unknown as a retrieval aid—not as a universal credibility score. Search results are ordered by textual relevance first and source category second, so a directly relevant NASA result can precede a social-media description; the order does not establish truth. Available publication dates are preserved. Nemotron must describe the relevance, relationship, and limitations of each cited result. A supported verdict without a cited retrieved URL is downgraded to insufficient evidence.
