@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
+type AnalysisMode = "quick" | "deep";
 type Claim = ClaimInsight;
-type Report = { claims: Claim[]; rewrite: string; model: string; providerCalls?: { nebius: number; tavily: number; total: number }; investigation?: InvestigationSummary };
+type Report = { claims: Claim[]; rewrite: string; model: string; mode?: AnalysisMode; providerCalls?: { nebius: number; tavily: number; total: number }; investigation?: InvestigationSummary };
 
 const verdicts: Record<Verdict, { label: string; short: string }> = {
   supported: { label: "Supported", short: "Supported" },
@@ -55,17 +56,39 @@ function reportMarkdown(report: Report, original: string) {
   return lines.join("\n");
 }
 
+
+function publishableDraft(report: Report) {
+  // All URLs are taken directly from the server-validated retrieved sources.
+  const links = new Map<string, string>();
+  for (const claim of report.claims) {
+    for (const source of claim.sources) {
+      if (!links.has(source.url)) links.set(source.url, source.title);
+    }
+  }
+  const citations = [...links].map(([url,title],index) =>
+    "[" + (index + 1) + "] " + title + " — " + url);
+  return [report.rewrite,
+    "",
+    "Retrieved sources to independently review:",
+    citations.length ? citations.join("\n") : "No source links were provided.",
+    "",
+    "AI-assisted research; verify original sources before publication."
+  ].join("\n");
+}
+
 export default function Analyzer() {
   const [content, setContent] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<AnalysisMode>("quick");
+  const [submittedContent, setSubmittedContent] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [expandedGuide, setExpandedGuide] = useState(false);
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
-  const markdown = report ? reportMarkdown(report, content) : "";
+  const markdown = report ? reportMarkdown(report, submittedContent) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
@@ -110,11 +133,12 @@ export default function Analyzer() {
     setError("");
     setNotice("");
     setReport(null);
+    const submitted = content;
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ content: submitted, mode })
       });
       const data: unknown = await response.json();
       const payload = data as Partial<Report> & { error?: string };
@@ -127,8 +151,10 @@ export default function Analyzer() {
       if (!Array.isArray(payload.claims) || typeof payload.rewrite !== "string" || typeof payload.model !== "string") {
         throw new Error("The analysis service returned an incomplete report.");
       }
+      setSubmittedContent(submitted);
       setReport(payload as Report);
-      setNotice("Live analysis complete. Review each retrieved source before publishing.");
+      setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
+      window.requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to analyze this content right now.");
     } finally {
@@ -143,6 +169,19 @@ export default function Analyzer() {
     } catch {
       setNotice("Copy was blocked by your browser. Select the text and copy it manually.");
     }
+  }
+
+  function downloadJson() {
+    if (!report) return;
+    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), original: submittedContent, report };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "evidencepilot-evidence.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setNotice("Structured evidence report downloaded.");
   }
 
   function downloadReport() {
@@ -199,8 +238,18 @@ export default function Analyzer() {
             />
             <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
+            <div className="mode-selector" role="group" aria-label="Choose investigation depth">
+              <button type="button" aria-pressed={mode === "quick"} className={"mode-option" + (mode === "quick" ? " selected" : "")} onClick={() => { setMode("quick"); setReport(null); }} disabled={busy}>
+                <span className="mode-title">Quick Check</span>
+                <span className="mode-description">Fewer AI calls · Basic search · Designed for speed</span>
+              </button>
+              <button type="button" aria-pressed={mode === "deep"} className={"mode-option" + (mode === "deep" ? " selected" : "")} onClick={() => { setMode("deep"); setReport(null); }} disabled={busy}>
+                <span className="mode-title">Deep Investigation</span>
+                <span className="mode-description">Research plans · Advanced search · Optional follow-up</span>
+              </button>
+            </div>
             <div className="input-divider" />
-            <div className="form-bottom"><div><strong>Three claims per analysis</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>Analyze evidence <span aria-hidden="true">↗</span></>}</button></div>
+            <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Consulting Nemotron and researching sources with Tavily. This may take a little time.</div>}
             {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span></div>}
           </div>
@@ -235,7 +284,7 @@ export default function Analyzer() {
 
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
-          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p></div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p></div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           <InvestigationOverview summary={report.investigation} />
           <div className="report-list">
@@ -248,7 +297,8 @@ export default function Analyzer() {
               <button className="claim-copy" type="button" onClick={() => copyText(claim.claim + "\n\n" + claim.explanation, "Claim assessment")}>Copy assessment ↗</button>
             </article>)}
           </div>
-          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={content} rewrite={report.rewrite} /></div>
+          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report), "Sourced draft")}>Copy with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
         </section>
       )}

@@ -1,10 +1,11 @@
 import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor, type Assessment, type SearchResult } from "./evidence";
 import { ProviderError, type ResearchPlan } from "./providers";
 
+export type AnalysisMode = "quick" | "deep";
 export type AnalysisProviders = {
   extractClaims(content: string): Promise<string[]>;
   planClaim(claim: string): Promise<ResearchPlan>;
-  searchClaim(query: string): Promise<SearchResult[]>;
+  searchClaim(query: string, mode?: AnalysisMode): Promise<SearchResult[]>;
   assess(claim: string, sources: SearchResult[], plan?: ResearchPlan): Promise<Assessment>;
   cautiousRewrite(original: string, assessments: { claim: string; verdict: string; explanation: string }[]): Promise<string>;
 };
@@ -23,7 +24,7 @@ const searchBudget = () => Math.min(2, Math.max(1, Number.parseInt(process.env.M
 const needsFollowup = (sources: SearchResult[]) =>
   sources.length < 2 || sources.every(source => ["social_media", "commentary", "unknown"].includes(categorizeSource(source)));
 
-export async function analyzeContent(content: string, providers: AnalysisProviders) {
+export async function analyzeContent(content: string, providers: AnalysisProviders, mode: AnalysisMode = "deep") {
   const claims = await providers.extractClaims(content);
   if (!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
 
@@ -35,7 +36,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     const cached = queryCache.get(key);
     if (cached) return cached;
     tavilyCalls++;
-    const task = providers.searchClaim(query).catch(error => {
+    const task = providers.searchClaim(query, mode).catch(error => {
       queryCache.delete(key);
       throw error;
     });
@@ -49,12 +50,16 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
 
   async function investigate(claim: string): Promise<ReviewedClaim> {
     let plan: ResearchPlan;
-    try {
-      nebiusCalls++;
-      plan = await providers.planClaim(claim);
-    } catch (error) {
-      if (error instanceof ProviderError && error.kind === "configuration") throw error;
-      plan = fallbackPlan(claim);
+    if (mode === "quick") {
+      plan = { ...fallbackPlan(claim), queries: [claim + " primary source fact check"] };
+    } else {
+      try {
+        nebiusCalls++;
+        plan = await providers.planClaim(claim);
+      } catch (error) {
+        if (error instanceof ProviderError && error.kind === "configuration") throw error;
+        plan = fallbackPlan(claim);
+      }
     }
     let results: SearchResult[];
     try {
@@ -68,7 +73,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
       };
     }
 
-    if (searchBudget() > 1 && needsFollowup(results) && plan.queries[1]) {
+    if (mode === "deep" && searchBudget() > 1 && needsFollowup(results) && plan.queries[1]) {
       followupSearches++;
       try {
         results = sanitizeSearchResults([...results, ...await retrieve(plan.queries[1])]);
@@ -105,6 +110,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
   return {
     claims: reviewed,
     rewrite,
+    mode,
     providerCalls: { nebius: nebiusCalls, tavily: tavilyCalls, total: nebiusCalls + tavilyCalls },
     investigation: {
       durationMs: Date.now() - started,

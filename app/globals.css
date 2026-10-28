@@ -32,3 +32,12 @@
 @media print{header,.hero,.workspace,.empty-guide,footer,.result-actions,.claim-copy,.notice,.source-notes summary,.investigation-details summary{display:none!important}main{max-width:none;padding:0}.results{padding:0;border:0}.claim-card,.rewrite-panel{break-inside:avoid;box-shadow:none}.research-reasoning details,.source-notes{display:block}.source-notes p,.investigation-details p{display:block}.evidence-entry{break-inside:avoid}.results-heading{margin-bottom:12px}body{background:white;color:black}}
 
 .inline-citation{font-weight:800;color:#246d4a;text-underline-offset:3px}.evidence-entry{scroll-margin-top:32px}.evidence-entry:target{outline:3px solid #8ac69f;outline-offset:3px}
+
+/* Real analysis modes */
+.mode-selector{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:20px}
+.mode-option{border:1px solid #d8e6db;text-align:left;background:#fbfcfb;border-radius:12px;padding:15px;display:grid;gap:6px;transition:border-color .15s,background .15s}
+.mode-option:hover{border-color:#7eab8e}.mode-option.selected{border:2px solid #28734d;background:#edf7ee;padding:14px}
+.mode-title{font-size:13px;color:#183d30;font-weight:800}.mode-description{font-size:11px;line-height:1.65;color:#668173}
+.mode-option.selected .mode-title::before{content:"● ";color:#28734d}.result-stale-note{font-size:12px;border:1px solid #e7d3a0;background:#fff9e7;border-radius:10px;padding:12px 14px;color:#765c1e;margin:14px 0}
+@media(max-width:560px){.mode-selector{grid-template-columns:1fr}.mode-option{padding:13px}.mode-option.selected{padding:12px}}
+@media print{.mode-selector,.result-stale-note{display:none!important}}

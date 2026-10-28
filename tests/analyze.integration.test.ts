@@ -36,3 +36,42 @@ test("preserves initial sources if an optional follow-up search fails",async()=>
   assert.equal(report.claims[0].retrievalStatus,undefined);
   assert.equal(report.providerCalls.tavily,2);
 });
+
+test("quick mode skips research planning and follow-up searches", async () => {
+  let plans = 0;
+  const modes: string[] = [];
+  const report = await analyzeContent("Claim input", {
+    extractClaims: async () => ["Jupiter is the largest planet."],
+    planClaim: async claim => { plans++; return plan(claim); },
+    searchClaim: async (_query, mode) => {
+      modes.push(mode || "");
+      return [{ title: "NASA source", url: "https://science.nasa.gov/jupiter/", content: "Jupiter is the largest planet." }];
+    },
+    assess: async claim => ({ claim, verdict: "supported", explanation: "NASA provides relevant evidence.", sourceIndices: [0] }),
+    cautiousRewrite: async () => "Jupiter is the largest planet."
+  }, "quick");
+  assert.equal(plans, 0);
+  assert.deepEqual(modes, ["quick"]);
+  assert.equal(report.mode, "quick");
+  assert.equal(report.providerCalls.nebius, 3);
+  assert.equal(report.providerCalls.tavily, 1);
+});
+test("deep mode creates a plan and uses advanced search", async () => {
+  let planned = 0;
+  const modes: string[] = [];
+  const report = await analyzeContent("Claim input", {
+    extractClaims: async () => ["The Earth revolves around the Sun."],
+    planClaim: async claim => { planned++; return { ...plan(claim), queries: ["earth revolution NASA"] }; },
+    searchClaim: async (_query, mode) => {
+      modes.push(mode || "");
+      return [{ title: "NASA", url: "https://science.nasa.gov/earth/", content: "The Earth orbits the Sun." },
+        { title: "NASA solar system", url: "https://science.nasa.gov/solar-system/", content: "Planets orbit the Sun." }];
+    },
+    assess: async claim => ({ claim, verdict: "supported", explanation: "Evidence agrees.", sourceIndices: [0] }),
+    cautiousRewrite: async () => "Earth orbits the Sun."
+  }, "deep");
+  assert.equal(planned, 1);
+  assert.deepEqual(modes, ["deep"]);
+  assert.equal(report.mode, "deep");
+  assert.equal(report.providerCalls.nebius, 4);
+});
