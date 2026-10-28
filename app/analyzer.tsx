@@ -23,7 +23,7 @@ const examples = [
   { title: "Explore a contextual claim", tag: "Geography", text: "The Sahara is the largest desert on Earth." }
 ];
 
-function reportMarkdown(report: Report, original: string, reviewedUrls: string[], completedAt: string | null) {
+function reportMarkdown(report: Report, original: string, reviewedUrls: string[], completedAt: string | null, sourceNotes: Record<string, string>) {
   const lines: string[] = [
     "# EvidencePilot evidence report",
     "",
@@ -57,6 +57,8 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
   lines.push("## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
   for (const source of uniqueCitedSources(report.claims)) {
     lines.push("- [" + (reviewedUrls.includes(source.url) ? "x" : " ") + "] [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")");
+    const note = sourceNotes[source.url]?.trim();
+    if (note) lines.push("  - Reader note: " + note.replace(/\s+/g, " ").slice(0, 600));
   }
   lines.push("", "Model: " + report.model);
   if (report.investigation) lines.push("Searches: " + report.investigation.uniqueSearches + " (follow-up: " + report.investigation.followupSearches + ")");
@@ -89,6 +91,7 @@ export default function Analyzer() {
   const [busy, setBusy] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewedUrls, setReviewedUrls] = useState<string[]>([]);
+  const [sourceNotes, setSourceNotes] = useState<Record<string, string>>({});
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [mode, setMode] = useState<AnalysisMode>("quick");
   const [submittedContent, setSubmittedContent] = useState("");
@@ -98,7 +101,7 @@ export default function Analyzer() {
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
-  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt) : "";
+  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
@@ -108,6 +111,10 @@ export default function Analyzer() {
     const interval = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
     return () => clearInterval(interval);
   }, [busy]);
+
+  function changeSourceNote(url: string, note: string) {
+    setSourceNotes(previous => ({ ...previous, [url]: note.slice(0, 600) }));
+  }
 
   function toggleReviewedSource(url: string) {
     setReviewedUrls(previous => previous.includes(url) ? previous.filter(item => item !== url) : [...previous, url]);
@@ -175,6 +182,7 @@ export default function Analyzer() {
       }
       setSubmittedContent(submitted);
       setReviewedUrls([]);
+      setSourceNotes({});
       setCompletedAt(new Date().toISOString());
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
@@ -197,7 +205,7 @@ export default function Analyzer() {
 
   function downloadJson() {
     if (!report) return;
-    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, note: "Reader-marked only; not independent verification." } };
+    const exportData = { product: "EvidencePilot", exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, sourceNotes, note: "Reader-marked only; not independent verification." } };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -323,7 +331,7 @@ export default function Analyzer() {
               <button className="claim-copy" type="button" onClick={() => copyText(claim.claim + "\n\n" + claim.explanation, "Claim assessment")}>Copy assessment ↗</button>
             </article>)}
           </div>
-          <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} />
+          <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} sourceNotes={sourceNotes} onNoteChange={changeSourceNote} />
           <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report), "Sourced draft")}>Copy with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
           {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
