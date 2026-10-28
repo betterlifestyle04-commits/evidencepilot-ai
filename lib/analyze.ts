@@ -1,3 +1,25 @@
 import { sourcesFor, type Assessment, type SearchResult } from "./evidence";
+import { ProviderError } from "./providers";
+
 export type AnalysisProviders = { extractClaims(content:string):Promise<string[]>; searchClaim(claim:string):Promise<SearchResult[]>; assess(claim:string,sources:SearchResult[]):Promise<Assessment>; cautiousRewrite(original:string,assessments:{claim:string;verdict:string;explanation:string}[]):Promise<string> };
-export async function analyzeContent(content:string, providers:AnalysisProviders) { const claims=await providers.extractClaims(content); if(!claims.length) throw new Error("No independently verifiable factual claims were found in this text."); const reviewed=[]; for(const claim of claims){const results=await providers.searchClaim(claim);const assessment=await providers.assess(claim,results);reviewed.push({...assessment,sources:sourcesFor(assessment.sourceIndices,results)});} const rewrite=await providers.cautiousRewrite(content,reviewed); return {claims:reviewed,rewrite,providerCalls:{nebius:claims.length+2,tavily:claims.length,total:(claims.length*2)+2}}; }
+type ReviewedClaim = Assessment & { sources: ReturnType<typeof sourcesFor>; retrievalStatus?: "unavailable" };
+
+export async function analyzeContent(content:string, providers:AnalysisProviders) {
+  const claims=await providers.extractClaims(content);
+  if(!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
+  const reviewed: ReviewedClaim[]=[];
+  let nebiusCalls=1, tavilyCalls=0;
+  for(const claim of claims){
+    let results: SearchResult[];
+    try { tavilyCalls++; results=await providers.searchClaim(claim); }
+    catch(error) {
+      if(error instanceof ProviderError && error.kind === "configuration") throw error;
+      reviewed.push({claim,verdict:"insufficient_evidence",explanation:"Evidence retrieval was temporarily unavailable for this claim, so no conclusion can be supported.",sourceIndices:[],sources:[],retrievalStatus:"unavailable"});
+      continue;
+    }
+    const assessment=await providers.assess(claim,results); nebiusCalls++;
+    reviewed.push({...assessment,sources:sourcesFor(assessment.sourceIndices,results)});
+  }
+  const rewrite=await providers.cautiousRewrite(content,reviewed); nebiusCalls++;
+  return {claims:reviewed,rewrite,providerCalls:{nebius:nebiusCalls,tavily:tavilyCalls,total:nebiusCalls+tavilyCalls}};
+}
