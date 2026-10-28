@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { EvidenceTrail, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
-type Evidence = { title: string; url: string; snippet: string };
-type Claim = { claim: string; verdict: Verdict; explanation: string; sources: Evidence[] };
-type Report = { claims: Claim[]; rewrite: string; model: string; providerCalls?: { nebius: number; tavily: number; total: number } };
+type Claim = ClaimInsight;
+type Report = { claims: Claim[]; rewrite: string; model: string; providerCalls?: { nebius: number; tavily: number; total: number }; investigation?: InvestigationSummary };
 
 const verdicts: Record<Verdict, { label: string; short: string }> = {
   supported: { label: "Supported", short: "Supported" },
@@ -20,11 +20,6 @@ const examples = [
   { title: "European affairs", tag: "Society", text: "The European Union has 27 member countries. Norway is a member of the European Union." }
 ];
 
-function hostname(url: string) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); }
-  catch { return "Source link"; }
-}
-
 function reportMarkdown(report: Report) {
   const lines: string[] = [
     "# EvidencePilot evidence report",
@@ -36,15 +31,23 @@ function reportMarkdown(report: Report) {
   ];
   report.claims.forEach((item, index) => {
     lines.push("### " + (index + 1) + ". " + item.claim);
-    lines.push("**Verdict:** " + verdicts[item.verdict].label, "", item.explanation, "");
+    lines.push("**Verdict:** " + verdicts[item.verdict].label);
+    if (item.evidenceStrength) lines.push("**Evidence strength:** " + item.evidenceStrength);
+    lines.push("", item.explanation, "");
+    if (item.qualifications) lines.push("**Qualifications:** " + item.qualifications, "");
     if (!item.sources.length) lines.push("No retrieved sources were cited.", "");
     else {
       lines.push("**Retrieved sources:**");
-      item.sources.forEach((source) => lines.push("- [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")"));
+      item.sources.forEach((source) => {
+        lines.push("- [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")" + (source.relationship ? " — " + source.relationship : ""));
+        if (source.relevance) lines.push("  - Relevance: " + source.relevance);
+        if (source.limitations) lines.push("  - Limitations: " + source.limitations);
+      });
       lines.push("");
     }
   });
-  lines.push("## Suggested cautious rewrite", "", report.rewrite, "", "Model: " + report.model);
+  lines.push("## Original text", "", "See submitted original in the workspace.", "", "## Suggested cautious rewrite", "", report.rewrite, "", "Model: " + report.model);
+  if (report.investigation) lines.push("Searches: " + report.investigation.uniqueSearches + " (follow-up: " + report.investigation.followupSearches + ")");
   return lines.join("\n");
 }
 
@@ -66,7 +69,7 @@ export default function Analyzer() {
     setContent(text);
     setReport(null);
     setError("");
-    setNotice("Sample text loaded. Run Analyze after the provider keys are configured.");
+    setNotice("Sample claim loaded. Select Analyze to perform a live evidence review.");
     document.getElementById("content")?.focus();
   }
 
@@ -230,17 +233,18 @@ export default function Analyzer() {
         <section className="results" id="results" aria-labelledby="results-title">
           <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p></div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
+          <InvestigationOverview summary={report.investigation} />
           <div className="report-list">
             {report.claims.map((claim, index) => <article className="claim-card" key={index}>
               <div className="claim-card-head"><span className="claim-index">CLAIM {String(index + 1).padStart(2, "0")}</span><span className={"verdict verdict-" + claim.verdict}>{verdicts[claim.verdict].label}</span></div>
-              <h3>{claim.claim}</h3><div className="assessment-label">ASSESSMENT</div><p className="claim-explanation">{claim.explanation}</p>
+              <h3>{claim.claim}</h3><ResearchReasoning claim={claim} /><div className="assessment-label">ASSESSMENT</div><p className="claim-explanation">{claim.explanation}</p>
               <div className="source-list"><div className="source-title"><span>RETRIEVED SOURCES</span><span>{claim.sources.length} cited</span></div>
-                {claim.sources.length ? claim.sources.map((source, sourceIndex) => <a key={sourceIndex} className="source-link" href={source.url} target="_blank" rel="noopener noreferrer"><div><strong>{source.title}</strong><p>{source.snippet}</p><span>{hostname(source.url)}</span></div><span aria-hidden="true">↗</span></a>) : <p className="no-sources">No retrieved sources cited. Treat this verdict with caution.</p>}
+                <EvidenceTrail sources={claim.sources} />
               </div>
               <button className="claim-copy" type="button" onClick={() => copyText(claim.claim + "\n\n" + claim.explanation, "Claim assessment")}>Copy assessment ↗</button>
             </article>)}
           </div>
-          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div><p>{report.rewrite}</p></div>
+          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={content} rewrite={report.rewrite} /></div>
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
         </section>
       )}
