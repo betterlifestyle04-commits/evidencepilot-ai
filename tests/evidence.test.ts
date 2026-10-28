@@ -36,3 +36,13 @@ test("downgrades a supported verdict with invalid citations to insufficient stre
   assert.equal(assessment.verdict,"insufficient_evidence");
   assert.equal(assessment.evidenceStrength,"insufficient");
 });
+
+test("retains original catalog indices for source-to-explanation linking",()=>{
+  const sources=[
+    {title:"First",url:"https://example.com/first",content:"Claim evidence"},
+    {title:"Second",url:"https://example.com/second",content:"Claim evidence"},
+    {title:"Third",url:"https://science.nasa.gov/source",content:"Claim evidence"}
+  ];
+  const selected=sourcesFor([2,0],sources);
+  assert.deepEqual(selected.map(source=>source.sourceIndex),[2,0]);
+});

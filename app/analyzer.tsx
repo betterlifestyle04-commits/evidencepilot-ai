@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { EvidenceTrail, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
+import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
 type Claim = ClaimInsight;
@@ -241,9 +241,9 @@ export default function Analyzer() {
           <div className="report-list">
             {report.claims.map((claim, index) => <article className="claim-card" key={index}>
               <div className="claim-card-head"><span className="claim-index">CLAIM {String(index + 1).padStart(2, "0")}</span><span className={"verdict verdict-" + claim.verdict}>{verdicts[claim.verdict].label}</span></div>
-              <h3>{claim.claim}</h3><ResearchReasoning claim={claim} /><div className="assessment-label">ASSESSMENT</div><p className="claim-explanation">{claim.explanation}</p>
+              <h3>{claim.claim}</h3><ResearchReasoning claim={claim} /><div className="assessment-label">ASSESSMENT</div><GroundedExplanation text={claim.explanation} sources={claim.sources} claimNumber={index + 1} />
               <div className="source-list"><div className="source-title"><span>RETRIEVED SOURCES</span><span>{claim.sources.length} cited</span></div>
-                <EvidenceTrail sources={claim.sources} />
+                <EvidenceTrail sources={claim.sources} claimNumber={index + 1} />
               </div>
               <button className="claim-copy" type="button" onClick={() => copyText(claim.claim + "\n\n" + claim.explanation, "Claim assessment")}>Copy assessment ↗</button>
             </article>)}

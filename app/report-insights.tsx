@@ -1,6 +1,6 @@
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
 export type EvidenceDetail = {
-  title: string; url: string; snippet: string;
+  title: string; url: string; snippet: string; sourceIndex?: number;
   publisher?: string; publishedDate?: string;
   sourceType?: "primary" | "academic" | "established_reporting" | "commentary" | "social_media" | "unknown";
   relationship?: "supports" | "contradicts" | "context" | "inconclusive";
@@ -60,7 +60,18 @@ export function ResearchReasoning({ claim }: { claim: ClaimInsight }) {
     </details>}
   </div>;
 }
-export function EvidenceTrail({ sources }: { sources: EvidenceDetail[] }) {
+export function GroundedExplanation({ text, sources, claimNumber }: { text: string; sources: EvidenceDetail[]; claimNumber: number }) {
+  const parts = text.split(/(\b[Ss]ource\s+\d+\b)/g);
+  return <p className="claim-explanation">{parts.map((part, index) => {
+    const match = /^[Ss]ource\s+(\d+)$/.exec(part);
+    const sourceIndex = match ? Number(match[1]) : null;
+    const known = sourceIndex !== null && sources.some(source => source.sourceIndex === sourceIndex);
+    if (known) return <a key={index} className="inline-citation" href={"#claim-" + claimNumber + "-source-" + sourceIndex}>{part}</a>;
+    return <span key={index}>{part}</span>;
+  })}</p>;
+}
+
+export function EvidenceTrail({ sources, claimNumber }: { sources: EvidenceDetail[]; claimNumber: number }) {
   if (!sources.length) return <p className="no-sources">No sources are cited for this claim. Do not treat the assessment as established fact.</p>;
   const support = sources.filter(s => s.relationship === "supports").length;
   const challenge = sources.filter(s => s.relationship === "contradicts").length;
@@ -69,8 +80,8 @@ export function EvidenceTrail({ sources }: { sources: EvidenceDetail[] }) {
     {sources.map((source, index) => {
       const type = source.sourceType && sourceTypes[source.sourceType];
       const relation = source.relationship && relationships[source.relationship];
-      return <article className="evidence-entry" key={source.url + index}>
-        <div className="evidence-entry-top"><span className="source-number">SOURCE {String(index + 1).padStart(2,"0")}</span>
+      return <article className="evidence-entry" key={source.url + index} id={source.sourceIndex === undefined ? undefined : "claim-" + claimNumber + "-source-" + source.sourceIndex}>
+        <div className="evidence-entry-top"><span className="source-number">SOURCE {source.sourceIndex === undefined ? String(index + 1).padStart(2,"0") : source.sourceIndex}</span>
           {relation && <span className={"relationship-tag relation-" + source.relationship}>{relation}</span>}
           {type && <span className="source-category">{type}</span>}
         </div>

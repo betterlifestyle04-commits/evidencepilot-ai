@@ -30,3 +30,5 @@
 .revision-original{background:#f9f9f7!important}.rewrite-panel .result-actions{flex-wrap:wrap}
 @media(max-width:650px){.investigation-overview{grid-template-columns:repeat(2,1fr)}.revision-comparison{grid-template-columns:1fr}.revision-comparison>div{padding:14px}}
 @media print{header,.hero,.workspace,.empty-guide,footer,.result-actions,.claim-copy,.notice,.source-notes summary,.investigation-details summary{display:none!important}main{max-width:none;padding:0}.results{padding:0;border:0}.claim-card,.rewrite-panel{break-inside:avoid;box-shadow:none}.research-reasoning details,.source-notes{display:block}.source-notes p,.investigation-details p{display:block}.evidence-entry{break-inside:avoid}.results-heading{margin-bottom:12px}body{background:white;color:black}}
+
+.inline-citation{font-weight:800;color:#246d4a;text-underline-offset:3px}.evidence-entry{scroll-margin-top:32px}.evidence-entry:target{outline:3px solid #8ac69f;outline-offset:3px}
