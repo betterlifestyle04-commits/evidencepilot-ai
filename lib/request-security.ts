@@ -1,12 +1,8 @@
-/**
- * Vercel supplies x-forwarded-for. Treat malformed values as one anonymous
- * bucket so an attacker cannot create arbitrary rate-limit keys with headers.
- */
+import { isIP } from "node:net";
+/** Accept only valid IPs from the trusted forwarding chain. */
 export function clientRateLimitKey(forwardedFor: string | null) {
   const candidate = forwardedFor?.split(",")[0]?.trim().toLowerCase() || "";
-  if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(candidate)) return `ip:${candidate}`;
-  if (/^[0-9a-f:]{2,64}$/.test(candidate)) return `ip:${candidate}`;
-  return "anonymous";
+  if (!candidate || candidate.length > 64 || isIP(candidate) === 0) return "anonymous";
+  return `ip:${candidate}`;
 }
-
 export function requestId() { return crypto.randomUUID(); }

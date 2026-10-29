@@ -29,3 +29,13 @@ A normal three-claim report with usable evidence uses eight provider calls: five
 If an individual Nemotron assessment fails after retrieval, that one claim is returned as insufficient evidence with `retrievalStatus: "assessment_unavailable"`; other claims remain available. If only the optional cautious rewrite fails, the report returns the original submitted text and `investigation.rewriteStatus: "unavailable"` rather than fabricating a correction or discarding completed claim work. Rate-limit keys use a truncated SHA-256 identifier, so Upstash receives a pseudonymous client key rather than the raw forwarded address.
 
 Requests must be JSON, have a declared body at or below 16 KB, and receive `no-store`/`nosniff` API response headers. Tavily results are deduplicated and only public HTTPS URLs are allowed through to assessment and rendering; local, credential-bearing, insecure, and malformed URLs are discarded.
+
+## Troubleshooting and operational transparency
+
+Every analysis response includes a random `requestId` and matching `X-Request-Id` header. Failures log only this ID and a coarse error category to Vercel, not pasted text, raw IPs, source excerpts, provider responses, or credentials. Users can share the ID to help diagnose failures.
+
+An assessment failure is reported as an `insufficient_evidence` partial claim. A rewrite failure returns original text with `investigation.rewriteStatus = unavailable`. Neither should be displayed as a successful AI verdict or AI-authored correction.
+
+IP addresses are syntax-validated and represented in Upstash by truncated SHA-256 hashes. This is **pseudonymization**, not anonymity; unsalted IP hashes may be reversible by enumeration.
+
+Quick Check uses fewer logical provider calls than Deep Investigation, but API compatibility fallbacks may add requests. `/api/health` checks credential presence, not actual connectivity or live provider health.

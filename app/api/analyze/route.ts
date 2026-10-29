@@ -39,6 +39,12 @@ export async function POST(request: NextRequest) {
     const report = await analyzeContent(content, providers, mode as AnalysisMode);
     return response({ ...report, model: process.env.NEBIUS_MODEL || "nvidia/nemotron-3-super-120b-a12b" }, 200, id);
   } catch (error) {
+    // Log only an opaque request ID and broad failure type, never user text or secrets.
+    const failureKind = error instanceof ProviderError ? "provider-" + error.kind
+      : error instanceof SyntaxError ? "invalid-json"
+      : error instanceof Error && error.message.includes("rate limit") ? "rate-limit-service"
+      : "internal";
+    console.error("[EvidencePilot] analysis failed", { requestId: id, kind: failureKind });
     if (error instanceof ProviderError) return response({
       error: error.kind === "configuration" ? "Provider configuration is incomplete."
         : error.kind === "timeout" ? "A provider timed out. Please try again."
