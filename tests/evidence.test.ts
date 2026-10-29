@@ -109,3 +109,30 @@ test("discards private address destinations, credential URLs and malformed searc
   ]);
   assert.deepEqual(sources.map(x=>x.title),["NASA"]);
 });
+
+
+test("downgrading unsupported model conclusions also removes contradictory explanation and qualifications",()=>{
+  const source=[{title:"Background",url:"https://example.org/background",content:"General background"}];
+  const item=validateAssessment({
+    claim:"A factual claim",verdict:"supported",
+    explanation:"This claim is DEFINITELY VERIFIED by the material.",
+    qualifications:"There is no uncertainty whatsoever.",
+    sourceIndices:[0],evidenceStrength:"strong",
+    sourceAssessments:[{index:0,relationship:"context",relevance:"Indirect",limitations:"No direct evidence"}]
+  },source);
+  assert.equal(item.verdict,"insufficient_evidence");
+  assert.equal(item.evidenceStrength,"insufficient");
+  assert.match(item.explanation,/downgraded to insufficient evidence/);
+  assert.doesNotMatch(item.explanation,/DEFINITELY VERIFIED/);
+  assert.equal(item.qualifications,undefined);
+  assert.equal(item.sourceIndices[0],0,"retain real source for human inspection");
+});
+test("an ungrounded decisive verdict cannot retain its original confident explanation",()=>{
+  const item=validateAssessment({
+    claim:"Another factual claim",verdict:"contradicted",
+    explanation:"Proven false beyond a doubt",sourceIndices:[],
+    evidenceStrength:"moderate"
+  },[]);
+  assert.equal(item.verdict,"insufficient_evidence");
+  assert.doesNotMatch(item.explanation,/Proven false beyond a doubt/);
+});

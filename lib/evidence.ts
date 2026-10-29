@@ -90,11 +90,15 @@ export function validateAssessment(value: unknown, sources: SearchResult[]): Ass
     if (verdict === "contradicted" && !relationships.has("contradicts")) verdict = "insufficient_evidence";
     if (verdict === "mixed" && !(relationships.has("supports") && relationships.has("contradicts"))) verdict = "insufficient_evidence";
   }
+  const verdictDowngraded = input.verdict !== "insufficient_evidence" && verdict === "insufficient_evidence";
+  const explanation = verdictDowngraded
+    ? "Evidence safeguard: The proposed verdict was downgraded to insufficient evidence because the cited retrieved links or source relationships did not substantiate it. The model's original conclusion is not being presented as established fact. Inspect original sources before drawing a conclusion."
+    : input.explanation.trim().slice(0, 1200);
   const strengths = ["strong","moderate","limited","insufficient"] as const;
   const rawStrength = strengths.includes(input.evidenceStrength as typeof strengths[number])
     ? input.evidenceStrength as typeof strengths[number] : "limited";
   const evidenceStrength = verdict === "insufficient_evidence" ? "insufficient" : rawStrength;
-  return { claim: input.claim.trim().slice(0, 400), verdict, explanation: input.explanation.trim().slice(0, 1200), sourceIndices, evidenceStrength, qualifications: typeof input.qualifications === "string" ? input.qualifications.slice(0,600) : undefined, sourceAssessments };
+  return { claim: input.claim.trim().slice(0, 400), verdict, explanation, sourceIndices, evidenceStrength, qualifications: !verdictDowngraded && typeof input.qualifications === "string" ? input.qualifications.slice(0,600) : undefined, sourceAssessments };
 }
 export function sourcesFor(indices: number[], sources: SearchResult[], assessments: SourceAssessment[] = []): Evidence[] { const output:Evidence[]=[];for(const index of indices){const source=sources[index];if(!source||!isSafeSourceUrl(source.url))continue;const review=assessments.find(item=>item.index===index);output.push({title:source.title?.trim().slice(0,240)||"Untitled source",url:source.url,snippet:source.content?.trim().slice(0,500)||"No excerpt supplied by Tavily.",sourceIndex:index,publisher:publisherFor(source.url),publishedDate:typeof source.published_date==="string"?source.published_date.slice(0,50):undefined,sourceType:categorizeSource(source),relationship:review?.relationship,relevance:review?.relevance,limitations:review?.limitations});}return output; }
 import { isIP } from "node:net";
