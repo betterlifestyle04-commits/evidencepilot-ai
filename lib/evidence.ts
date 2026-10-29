@@ -1,3 +1,4 @@
+import { isSafeSourceUrl } from "./source-url";
 export type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
 export type SearchResult = { title?: string; url?: string; content?: string; published_date?: string };
 export type SourceType = "primary"|"academic"|"established_reporting"|"commentary"|"social_media"|"unknown";
@@ -101,20 +102,8 @@ export function validateAssessment(value: unknown, sources: SearchResult[]): Ass
   return { claim: input.claim.trim().slice(0, 400), verdict, explanation, sourceIndices, evidenceStrength, qualifications: !verdictDowngraded && typeof input.qualifications === "string" ? input.qualifications.slice(0,600) : undefined, sourceAssessments };
 }
 export function sourcesFor(indices: number[], sources: SearchResult[], assessments: SourceAssessment[] = []): Evidence[] { const output:Evidence[]=[];for(const index of indices){const source=sources[index];if(!source||!isSafeSourceUrl(source.url))continue;const review=assessments.find(item=>item.index===index);output.push({title:source.title?.trim().slice(0,240)||"Untitled source",url:source.url,snippet:source.content?.trim().slice(0,500)||"No excerpt supplied by Tavily.",sourceIndex:index,publisher:publisherFor(source.url),publishedDate:typeof source.published_date==="string"?source.published_date.slice(0,50):undefined,sourceType:categorizeSource(source),relationship:review?.relationship,relevance:review?.relevance,limitations:review?.limitations});}return output; }
-import { isIP } from "node:net";
-
-/** Public HTTPS citation destinations only; do not render local/private links. */
-export function isSafeSourceUrl(value: unknown): value is string {
-  if (typeof value !== "string" || value.length > 2048) return false;
-  try {
-    const url = new URL(value);
-    const host = url.hostname.toLowerCase().replace(/\.$/, "");
-    const unbracketed = host.replace(/^\[/, "").replace(/\]$/, "");
-    if (url.protocol !== "https:" || url.username || url.password || !host || isIP(unbracketed) !== 0) return false;
-    if (host === "localhost" || /\.(?:localhost|local|internal|lan|home|test|invalid)$/.test(host)) return false;
-    return true;
-  } catch { return false; }
-}
+/** Keep server evidence citations and imported browser reports on the same URL policy. */
+export { isSafeSourceUrl } from "./source-url";
 export function publisherFor(url: string) { return new URL(url).hostname.replace(/^www\./, ""); }
 const domainOrSubdomain = (host: string, domain: string) => host === domain || host.endsWith("." + domain);
 /**
