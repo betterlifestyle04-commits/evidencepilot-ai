@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeContent } from "../lib/analyze";
+import { analyzeContent, NoCheckableClaimsError } from "../lib/analyze";
 const plan=(claim:string)=>({normalizedClaim:claim,claimType:"scientific" as const,timeSensitive:false,entities:["Mars"],evidenceNeeded:"Direct observation",queries:[`${claim} science`,`${claim} primary source`]});
 test("investigates claims with bounded plans and grounded citations",async()=>{const searches:string[]=[];const report=await analyzeContent("Input",{extractClaims:async()=>["Mars is the biggest planet."],planClaim:async claim=>plan(claim),searchClaim:async query=>{searches.push(query);return [{title:"NASA",url:"https://science.nasa.gov/mars/",content:"Mars is the fourth planet."}]},assess:async claim=>({claim,verdict:"contradicted",explanation:"The retrieved NASA text conflicts with the claim.",sourceIndices:[0],evidenceStrength:"strong",sourceAssessments:[{index:0,relationship:"contradicts",relevance:"Directly identifies Mars as fourth.",limitations:"Excerpt is short."}]}),cautiousRewrite:async()=>"Mars is the fourth planet from the Sun."});assert.equal(searches.length,2);assert.equal(report.claims[0].sources[0].publisher,"science.nasa.gov");assert.equal(report.claims[0].sources[0].relationship,"contradicts");assert.equal(report.claims[0].evidenceStrength,"strong");assert.deepEqual(report.providerCalls,{nebius:4,tavily:2,total:6});});
 test("uses one follow-up search only when initial evidence is weak",async()=>{const queries:string[]=[];const report=await analyzeContent("Input",{extractClaims:async()=>["A claim."],planClaim:async claim=>plan(claim),searchClaim:async query=>{queries.push(query);return query.endsWith("science")?[{title:"Post",url:"https://example.com/blog",content:"Opinion"}]:[{title:"NASA",url:"https://nasa.gov/data",content:"Direct record"}]},assess:async claim=>({claim,verdict:"supported",explanation:"Supported.",sourceIndices:[1]}),cautiousRewrite:async()=>"Rewrite"});assert.equal(queries.length,2);assert.equal(report.providerCalls.tavily,2);});
@@ -109,4 +109,16 @@ test("investigation duration includes claim extraction",async()=>{
     cautiousRewrite: async()=> "Jupiter is the largest planet."
   },"quick");
   assert.ok(report.investigation.durationMs >= 25,"elapsed time must include slow claim extraction");
+});
+
+test("opinion-only text returns a typed no-claims outcome without performing searches", async () => {
+  let searches = 0;
+  await assert.rejects(() => analyzeContent("I believe sunsets are truly the best things ever.", {
+    extractClaims: async () => [],
+    planClaim: async claim => plan(claim),
+    searchClaim: async () => { searches++; return []; },
+    assess: async claim => ({claim, verdict: "insufficient_evidence", explanation: "No evidence", sourceIndices: []}),
+    cautiousRewrite: async () => "Not used"
+  }, "quick"), (error: unknown) => error instanceof NoCheckableClaimsError);
+  assert.equal(searches, 0);
 });

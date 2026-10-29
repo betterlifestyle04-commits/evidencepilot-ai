@@ -23,6 +23,10 @@ export function analysisFailure(status: number, data: unknown, retryAfter: strin
   const body = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : {};
   const requestId = validRequestId(body.requestId) ? body.requestId : null;
   const detail = requestId ? " Request ID: " + requestId + "." : "";
+  if (status === 422 && body.code === "NO_CHECKABLE_CLAIMS") {
+    return { message: "No checkable factual statements were detected. Try a concrete claim with a date, number, event, or measurable fact. You can load an example below without submitting automatically." + detail,
+      cooldownSeconds: null, recommendQuick: false, requestId };
+  }
   if (status === 429) {
     const seconds = readRetryAfter(retryAfter);
     return {

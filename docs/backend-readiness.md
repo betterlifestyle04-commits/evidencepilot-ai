@@ -39,3 +39,8 @@ An assessment failure is reported as an `insufficient_evidence` partial claim. A
 IP addresses are syntax-validated and represented in Upstash by truncated SHA-256 hashes. This is **pseudonymization**, not anonymity; unsalted IP hashes may be reversible by enumeration.
 
 Quick Check uses fewer logical provider calls than Deep Investigation, but API compatibility fallbacks may add requests. `/api/health` checks credential presence, not actual connectivity or live provider health.
+
+
+## Expected no-claim submissions and malformed model responses
+
+When Nebius returns an empty list of factually verifiable claims for opinion-only text, the API responds with HTTP `422`, code `NO_CHECKABLE_CLAIMS`, and actionable guidance. It does not pretend an AI outage occurred or launch Tavily searches. The standard rate limit still applies because claim extraction consumes one Nebius call. A malformed model JSON response is handled as an upstream provider error, not mistaken for malformed user request JSON. An empty AI rewrite is rejected and the original input remains visibly labeled as retained text.

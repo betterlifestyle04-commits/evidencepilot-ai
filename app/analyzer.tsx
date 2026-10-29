@@ -103,6 +103,7 @@ export default function Analyzer() {
   const [retryUntil, setRetryUntil] = useState<number | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [suggestQuick, setSuggestQuick] = useState(false);
+  const [noCheckableClaims, setNoCheckableClaims] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewedUrls, setReviewedUrls] = useState<string[]>([]);
   const [sourceNotes, setSourceNotes] = useState<Record<string, string>>({});
@@ -157,6 +158,7 @@ export default function Analyzer() {
   }
 
   function useExample(text: string) {
+    setNoCheckableClaims(false);
     setContent(text);
     setReport(null);
     setError("");
@@ -224,6 +226,7 @@ export default function Analyzer() {
     requestInFlight.current = true;
     setBusy(true);
     setSuggestQuick(false);
+    setNoCheckableClaims(false);
     // Keep the last successful report accessible during retries and on failure.
     setElapsedSeconds(0);
     setError("");
@@ -239,6 +242,7 @@ export default function Analyzer() {
       const data: unknown = await response.json();
       const payload = data as Partial<Report> & { error?: string; requestId?: string };
       if (!response.ok) {
+        setNoCheckableClaims(response.status === 422 && (payload as { code?: unknown }).code === "NO_CHECKABLE_CLAIMS");
         const feedback = analysisFailure(response.status, payload, response.headers.get("retry-after"));
         if (feedback.cooldownSeconds) {
           const now = Date.now();
@@ -368,7 +372,8 @@ export default function Analyzer() {
             <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : waitSeconds > 0 ? <>Retry in {waitSeconds}s</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
             {busy && report && <p className="previous-report-note" role="status">Your previous report remains available below while a new analysis runs. It is not a result of the new request.</p>}
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Live {mode === "deep" ? "deep investigation" : "quick check"} in progress. <span className="busy-duration" aria-hidden="true">{elapsedSeconds}s elapsed.</span> Provider requests may take some time; this is a real timer, not simulated research stages.</div>}
-            {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span>
+            {error && <div className={"error-banner" + (noCheckableClaims ? " no-claims-feedback" : "")} role="alert"><strong>{noCheckableClaims ? "No checkable claims found" : "Analysis unavailable"}</strong><span>{error}</span>
+              {noCheckableClaims && <button type="button" className="retry-quick-button" onClick={() => useExample(examples[0].text)} disabled={busy}>Load an example factual claim (does not analyze automatically)</button>}
               {report && <span>Your last completed report is still available below and was not updated by this failed request.</span>}
               {waitSeconds > 0 && <span className="retry-countdown" role="status">Next allowed attempt in approximately {waitSeconds} seconds. The public demo is rate limited to protect provider credits.</span>}
               {suggestQuick && mode === "deep" && <button type="button" className="retry-quick-button" onClick={() => { setMode("quick"); setSuggestQuick(false); setError(""); }} disabled={busy}>Switch to Quick Check (does not submit automatically)</button>}

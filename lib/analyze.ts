@@ -2,6 +2,10 @@ import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor,
 import { ProviderError, type ResearchPlan } from "./providers";
 
 export type AnalysisMode = "quick" | "deep";
+/** Expected, non-provider error: the supplied text has no checkable facts. */
+export class NoCheckableClaimsError extends Error {
+  constructor() { super("No independently checkable factual claims were found."); this.name = "NoCheckableClaimsError"; }
+}
 export type AnalysisProviders = {
   extractClaims(content: string): Promise<string[]>;
   planClaim(claim: string): Promise<ResearchPlan>;
@@ -28,7 +32,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
   // Full request latency includes the model's claim-extraction stage.
   const started = Date.now();
   const claims = await providers.extractClaims(content);
-  if (!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
+  if (!claims.length) throw new NoCheckableClaimsError();
 
   let nebiusCalls = 1, tavilyCalls = 0, followupSearches = 0;
   const queryCache = new Map<string, Promise<SearchResult[]>>();

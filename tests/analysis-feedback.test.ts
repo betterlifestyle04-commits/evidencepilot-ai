@@ -31,3 +31,12 @@ test("untrusted request identifiers are not echoed", () => {
   assert.equal(result.requestId, null);
   assert.doesNotMatch(result.message, /<script>/);
 });
+
+test("no factual claims is an actionable validation outcome, not a provider outage",()=>{
+  const response=analysisFailure(422,{code:"NO_CHECKABLE_CLAIMS",error:"No independently checkable facts.",requestId},null);
+  assert.match(response.message,/No checkable factual statements/);
+  assert.match(response.message,/load an example/);
+  assert.equal(response.cooldownSeconds,null);
+  assert.equal(response.recommendQuick,false);
+  assert.equal(response.requestId,requestId);
+});
