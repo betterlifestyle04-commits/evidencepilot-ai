@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
     if (typeof content !== "string" || content.trim().length < 20 || content.length > 12_000) {
       return response({ error: "Content must be between 20 and 12,000 characters." }, 400, id);
     }
+    if (Buffer.byteLength(content, "utf8") > MAX_BODY_BYTES) {
+      return response({ error: "Request payload is too large." }, 413, id);
+    }
     if (mode !== "quick" && mode !== "deep") {
       return response({ error: "Mode must be quick or deep." }, 400, id);
     }
