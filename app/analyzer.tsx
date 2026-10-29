@@ -9,6 +9,8 @@ type AnalysisMode = "quick" | "deep";
 type Claim = ClaimInsight;
 type Report = { claims: Claim[]; rewrite: string; model: string; mode?: AnalysisMode; providerCalls?: { nebius: number; tavily: number; total: number }; investigation?: InvestigationSummary };
 type ServiceStatus = "checking" | "ready" | "degraded" | "unavailable";
+type SessionRun = { id: string; completedAt: string; mode: AnalysisMode; claims: number; attention: number; sources: number };
+const sessionRunsKey = "evidencepilot-session-runs-v1";
 
 const verdicts: Record<Verdict, { label: string; short: string }> = {
   supported: { label: "Supported", short: "Supported" },
@@ -96,6 +98,7 @@ export default function Analyzer() {
   const [notice, setNotice] = useState("");
   const [expandedGuide, setExpandedGuide] = useState(false);
   const [serviceStatus, setServiceStatus] = useState<ServiceStatus>("checking");
+  const [sessionRuns, setSessionRuns] = useState<SessionRun[]>([]);
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
@@ -123,6 +126,14 @@ export default function Analyzer() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    try {
+      const stored: unknown = JSON.parse(window.sessionStorage.getItem(sessionRunsKey) || "[]");
+      if (!Array.isArray(stored)) return;
+      setSessionRuns(stored.filter((run): run is SessionRun => Boolean(run && typeof run === "object" && typeof (run as SessionRun).id === "string" && typeof (run as SessionRun).completedAt === "string" && ((run as SessionRun).mode === "quick" || (run as SessionRun).mode === "deep") && Number.isInteger((run as SessionRun).claims) && Number.isInteger((run as SessionRun).attention) && Number.isInteger((run as SessionRun).sources))).slice(0, 5));
+    } catch { /* Browser storage is optional. */ }
+  }, []);
+
   function toggleReviewedSource(url: string) {
     setReviewedUrls(previous => previous.includes(url) ? previous.filter(item => item !== url) : [...previous, url]);
   }
@@ -138,6 +149,20 @@ export default function Analyzer() {
   function startAnotherAnalysis() {
     document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
     window.setTimeout(() => document.getElementById("content")?.focus(), 350);
+  }
+
+  function recordSessionRun(next: SessionRun) {
+    setSessionRuns(previous => {
+      const updated = [next, ...previous].slice(0, 5);
+      try { window.sessionStorage.setItem(sessionRunsKey, JSON.stringify(updated)); } catch { /* Browser storage is optional. */ }
+      return updated;
+    });
+  }
+
+  function clearSessionRuns() {
+    setSessionRuns([]);
+    try { window.sessionStorage.removeItem(sessionRunsKey); } catch { /* Browser storage is optional. */ }
+    setNotice("Session activity cleared from this browser tab.");
   }
 
   async function importTextFile(file: File | undefined) {
@@ -192,10 +217,14 @@ export default function Analyzer() {
       if (!Array.isArray(payload.claims) || typeof payload.rewrite !== "string" || typeof payload.model !== "string") {
         throw new Error("The analysis service returned an incomplete report.");
       }
+      const completed = new Date().toISOString();
+      const completedReport = payload as Report;
+      const attention = completedReport.claims.filter(claim => claim.verdict !== "supported").length;
+      recordSessionRun({ id: crypto.randomUUID(), completedAt: completed, mode: completedReport.mode || mode, claims: completedReport.claims.length, attention, sources: uniqueCitedSources(completedReport.claims).length });
       setSubmittedContent(submitted);
       setReviewedUrls([]);
-      setCompletedAt(new Date().toISOString());
-      setReport(payload as Report);
+      setCompletedAt(completed);
+      setReport(completedReport);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
       window.requestAnimationFrame(() => document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (caught) {
@@ -331,6 +360,10 @@ export default function Analyzer() {
             <div className="platform-status-line"><i className={"status-orb status-" + serviceStatus} /><strong>{serviceStatus === "ready" ? "Analysis service configured" : serviceStatus === "checking" ? "Checking workspace" : serviceStatus === "degraded" ? "Secure setup needed" : "Status check unavailable"}</strong></div>
             <p>{serviceStatus === "ready" ? "Secure server bindings are present. Provider behavior still depends on each live request." : serviceStatus === "checking" ? "Checking non-secret server readiness…" : "This workspace cannot run live analysis until its server-side provider and rate-limit configuration is complete."}</p>
             <span className="platform-privacy">No API keys are sent to your browser.</span>
+          </div>
+          <div className="side-card session-card">
+            <div className="session-card-heading"><span className="side-eyebrow">THIS SESSION</span>{sessionRuns.length > 0 && <button type="button" className="session-clear" onClick={clearSessionRuns}>Clear</button>}</div>
+            {sessionRuns.length === 0 ? <p className="session-empty">Your completed analyses will appear here. Submitted text and sources are never stored in this activity trail.</p> : <><div className="session-total"><strong>{sessionRuns.length}</strong><span>{sessionRuns.length === 1 ? "completed analysis" : "completed analyses"}</span></div><ol className="session-list">{sessionRuns.map(run => <li key={run.id}><span className="session-mode">{run.mode === "deep" ? "Deep" : "Quick"}</span><div><strong>{run.claims} claims · {run.sources} sources</strong><small>{run.attention ? run.attention + " need attention" : "No flagged verdicts"} · {new Date(run.completedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small></div></li>)}</ol><p className="session-note">Private to this browser tab. Clears when the tab session ends.</p></>}
           </div>
         </aside>
       </section>
