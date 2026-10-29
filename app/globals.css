@@ -287,3 +287,7 @@
   .claim-card,.source-review-entry,.editorial-decision{break-inside:avoid}
   a{color:#111!important}
 }
+
+/* Expected no-facts outcome is an editorial prompt, not a red service outage */
+.no-claims-feedback{background:#f1f7fc;border-color:#bbd8ec;color:#2e5976}
+.no-claims-feedback .retry-quick-button{border-color:#a2c9e4;color:#225b83;background:#fff}

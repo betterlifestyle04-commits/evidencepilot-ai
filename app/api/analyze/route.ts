@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeContent, type AnalysisMode } from "@/lib/analyze";
+import { analyzeContent, NoCheckableClaimsError, type AnalysisMode } from "@/lib/analyze";
 import * as providers from "@/lib/providers";
 import { ProviderError } from "@/lib/providers";
 import { checkRateLimit, rateLimitInfo } from "@/lib/rate-limit";
@@ -39,6 +39,11 @@ export async function POST(request: NextRequest) {
     const report = await analyzeContent(content, providers, mode as AnalysisMode);
     return response({ ...report, model: process.env.NEBIUS_MODEL || "nvidia/nemotron-3-super-120b-a12b" }, 200, id);
   } catch (error) {
+    // A valid opinion-only submission is not a service outage or malformed JSON.
+    if (error instanceof NoCheckableClaimsError) return response({
+      code: "NO_CHECKABLE_CLAIMS",
+      error: "No independently checkable factual statements were found. Try a specific claim involving dates, numbers, events, or measurable facts."
+    }, 422, id);
     // Log only an opaque request ID and broad failure type, never user text or secrets.
     const failureKind = error instanceof ProviderError ? "provider-" + error.kind
       : error instanceof SyntaxError ? "invalid-json"
