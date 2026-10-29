@@ -16,7 +16,7 @@ Set `MAX_ANALYSIS_DURATION_MS` below the Vercel function duration (default 50 se
 | `TAVILY_API_KEY` | Server-only Tavily Search credential |
 | `UPSTASH_REDIS_REST_URL` | Shared rate-limit service URL |
 | `UPSTASH_REDIS_REST_TOKEN` | Shared rate-limit service credential |
-| `NEBIUS_MODEL` | Optional override; default is `nvidia/Nemotron-3_5-Lightning` |
+| `NEBIUS_MODEL` | Optional override; default is `nvidia/nemotron-3-super-120b-a12b` |
 
 No key may use a `NEXT_PUBLIC_` prefix. In production the API fails closed if the shared rate-limit store is absent, preventing unbounded credit consumption. The limit is three analyses per minute per forwarded client IP. Configure Vercel to pass `x-forwarded-for` and allow the 60-second function duration.
 
@@ -32,4 +32,4 @@ Tavily retries one transient failure only (408, 429, 5xx, timeout, or transport 
 
 If an individual Nemotron assessment fails after retrieval, that one claim is returned as insufficient evidence with `retrievalStatus: "assessment_unavailable"`; other claims remain available. If only the optional cautious rewrite fails, the report returns the original submitted text and `investigation.rewriteStatus: "unavailable"` rather than fabricating a correction or discarding completed claim work. Rate-limit keys use a truncated SHA-256 identifier, so Upstash receives a pseudonymous client key rather than the raw forwarded address.
 
-Requests must be JSON and remain at or below 16 KB both by declared content length and by parsed UTF-8 content size; this prevents chunked or multibyte payloads from bypassing the public-demo budget. API responses receive `no-store`/`nosniff` headers. Tavily results are deduplicated and only public HTTPS URLs are allowed through to assessment and rendering; local, credential-bearing, insecure, and malformed URLs are discarded.
+Requests must be JSON and remain at or below 16 KB both by declared content length and by the actual UTF-8 request body size; this prevents chunked, multibyte, or unused JSON fields from bypassing the public-demo budget. A 429 response includes `Retry-After: 60` so clients can wait instead of immediately retrying. API responses receive `no-store`/`nosniff` headers. Tavily results are deduplicated and only public HTTPS URLs are allowed through to assessment and rendering; local, credential-bearing, insecure, and malformed URLs are discarded.

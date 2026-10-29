@@ -21,16 +21,19 @@ export async function POST(request: NextRequest) {
     if (Number.isFinite(length) && length > MAX_BODY_BYTES) {
       return response({ error: "Request payload is too large." }, 413, id);
     }
-    const body: unknown = await request.json();
+    // Check the bytes actually received, not only Content-Length. Chunked
+    // requests need the same public-demo budget as requests with a header.
+    const rawBody = await request.text();
+    if (Buffer.byteLength(rawBody, "utf8") > MAX_BODY_BYTES) {
+      return response({ error: "Request payload is too large." }, 413, id);
+    }
+    const body: unknown = JSON.parse(rawBody);
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return response({ error: "Request body must contain content and an optional mode." }, 400, id);
     }
     const { content, mode = "quick" } = body as Record<string, unknown>;
     if (typeof content !== "string" || content.trim().length < 20 || content.length > 12_000) {
       return response({ error: "Content must be between 20 and 12,000 characters." }, 400, id);
-    }
-    if (Buffer.byteLength(content, "utf8") > MAX_BODY_BYTES) {
-      return response({ error: "Request payload is too large." }, 413, id);
     }
     if (mode !== "quick" && mode !== "deep") {
       return response({ error: "Mode must be quick or deep." }, 400, id);
