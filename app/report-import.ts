@@ -1,5 +1,6 @@
 import type { ClaimInsight, EvidenceDetail, InvestigationSummary } from "./report-insights";
 import { parseEditorialReview, type EditorialReview } from "./editorial-review";
+import { isSafeSourceUrl } from "../lib/source-url";
 
 /**
  * Only accepts self-contained EvidencePilot exports. All imported data is
@@ -48,21 +49,10 @@ function number(value: unknown): number | undefined {
 function oneOf<T extends string>(value: unknown, allowed: Set<string>): T | undefined {
   return typeof value === "string" && allowed.has(value) ? value as T : undefined;
 }
-function safeUrl(value: unknown): value is string {
-  if (typeof value !== "string" || value.length > 2048) return false;
-  try {
-    const parsed = new URL(value);
-    const host = parsed.hostname.toLowerCase();
-    return parsed.protocol === "https:"
-      && !parsed.username && !parsed.password
-      && host !== "localhost" && !host.endsWith(".local")
-      && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host)
-      && !host.includes("%");
-  } catch { return false; }
-}
+
 function parseEvidence(value: unknown): EvidenceDetail {
   const e = object(value);
-  if (!safeUrl(e.url)) throw new Error("Saved report contains an unsafe source URL.");
+  if (!isSafeSourceUrl(e.url)) throw new Error("Saved report contains an unsafe source URL.");
   return {
     title: text(e.title, 240, "source title"),
     url: e.url,

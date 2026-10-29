@@ -95,3 +95,20 @@ test("does not import unsafe unassessed research leads",()=>{
   claim.unassessedSources=[{title:"Internal",url:"https://localhost/internal",snippet:"Confidential"}];
   assert.throws(()=>parseSavedReport(JSON.stringify(fixture)),/unsafe source URL/);
 });
+
+test("browser import uses the same public-source URL safety policy as live research",()=>{
+  for(const unsafe of [
+    "https://[::1]/private", "https://[2001:db8::1]/record",
+    "https://0x7f000001/admin", "https://router.lan/config",
+    "https://private.internal/secret", "https://unit.test",
+    "https://machine.home/", "https://intranet",
+    "https://user:pass@example.org/report"
+  ]) {
+    const fixture=exportFixture();
+    fixture.report.claims[0].sources[0].url=unsafe;
+    assert.throws(()=>parseSavedReport(JSON.stringify(fixture)),/unsafe source URL/,unsafe);
+  }
+  const good=exportFixture();
+  good.report.claims[0].sources[0].url="https://example.org/article?id=42";
+  assert.equal(parseSavedReport(JSON.stringify(good)).report.claims[0].sources[0].url,"https://example.org/article?id=42");
+});

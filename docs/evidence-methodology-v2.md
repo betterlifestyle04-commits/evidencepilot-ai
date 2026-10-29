@@ -42,3 +42,8 @@ Deduplication retains query parameters used to identify distinct documents and v
 Deep Investigation research plans can suggest an alternate normalization of a claim, and models can paraphrase the claim in their assessment response. Neither is allowed to silently replace the extracted claim: searches are ranked for the original extracted wording, the assessment receives that exact wording, and the report keeps it even if a plan, assessment or provider fallback proposes different text. Planner-suggested wording remains visible as contextual metadata, not as the statement being verified.
 
 When deterministic evidence safeguards reduce a model's decisive assessment to `insufficient_evidence` (missing valid citations or incompatible source relationships), the original potentially confident explanation is replaced with a neutral safeguard explanation rather than being displayed alongside the downgraded verdict. Source citations remain available for human inspection. This does not independently validate model claims or guarantee search relevance.
+
+
+## Browser import citation link policy
+
+Live search citations and reopened saved JSON reports now share a browser-compatible URL validator. It requires HTTPS with a public-looking DNS name and rejects local-only domain suffixes, single-label intranet hosts, credential-bearing links, and numeric IPv4/IPv6 address literals, including encoded IP host forms normalized by the URL parser. This is a static link filter, not DNS-based verification or an authenticity guarantee: a public-looking DNS name can still resolve to a private address. EvidencePilot does not auto-fetch imported links; readers choose whether to open them.

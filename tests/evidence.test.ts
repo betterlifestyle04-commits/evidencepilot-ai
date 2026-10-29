@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { categorizeSource, parseClaims, parseJsonObject, rankSearchResults, sanitizeSearchResults, sourcesFor, validateAssessment, type SearchResult } from "../lib/evidence";
+import { categorizeSource, isSafeSourceUrl, parseClaims, parseJsonObject, rankSearchResults, sanitizeSearchResults, sourcesFor, validateAssessment, type SearchResult } from "../lib/evidence";
 test("parses, de-duplicates, and caps claims at three",()=>{const claims=parseClaims(["A verifiable claim is here.","A verifiable claim is here.","Another claim with enough text.","Third claim with enough text.","Fourth claim with enough text."]);assert.equal(claims.length,3);});
 test("accepts a fenced compatible JSON fallback",()=>assert.equal(parseJsonObject("```json\n{\"ok\":true}\n``` ").ok,true));
 test("never permits supported without a cited retrieved URL",()=>{const sources=[{title:"Good",url:"https://example.com",content:"Excerpt"},{title:"Bad",url:"javascript:alert(1)",content:"No"}];const assessment=validateAssessment({claim:"A claim long enough",verdict:"supported",explanation:"The result supports it.",sourceIndices:[1]},sources);assert.equal(assessment.verdict,"insufficient_evidence");assert.equal(sourcesFor(assessment.sourceIndices,sources).length,0);});
@@ -135,4 +135,20 @@ test("an ungrounded decisive verdict cannot retain its original confident explan
   },[]);
   assert.equal(item.verdict,"insufficient_evidence");
   assert.doesNotMatch(item.explanation,/Proven false beyond a doubt/);
+});
+
+test("source policy rejects local aliases and numeric hosts while accepting public HTTPS domains",()=>{
+  for (const unsafe of [
+    "https://[::1]/private", "https://[2001:4860:4860::8888]/",
+    "https://10.0.0.1/private", "https://0x7f000001/private",
+    "https://127.0.0.1.nothing.test/private", "https://internal/dashboard",
+    "https://service.localhost/page", "https://docs.internal/page",
+    "https://unit.test/fixture", "https://router.lan/page",
+    "https://machine.home/", "https://user:pass@example.com/",
+    "http://example.org/page", "https://example..org/page"
+  ]) assert.equal(isSafeSourceUrl(unsafe), false, unsafe);
+  for (const safe of [
+    "https://science.nasa.gov/jupiter/", "https://www.reuters.com/world/news",
+    "https://example.org/article?id=12", "https://sub.example.co.uk/reference"
+  ]) assert.equal(isSafeSourceUrl(safe), true, safe);
 });
