@@ -6,16 +6,38 @@ export type Evidence = { title: string; url: string; snippet: string; sourceInde
 export type SourceAssessment = { index: number; relationship: EvidenceRelationship; relevance: string; limitations: string };
 export type Assessment = { claim: string; verdict: Verdict; explanation: string; sourceIndices: number[]; evidenceStrength?: "strong"|"moderate"|"limited"|"insufficient"; qualifications?: string; sourceAssessments?: SourceAssessment[] };
 
+/**
+ * Deduplicate equivalent citation URLs, not every page that shares a path.
+ * Identifier parameters such as ?v=, ?id=, and ?article= MUST be preserved.
+ * Only known marketing/tracking parameters are ignored for identity.
+ */
+const trackingParams = new Set([
+  "fbclid", "gclid", "dclid", "msclkid", "igshid", "mc_cid", "mc_eid",
+  "ref", "ref_src", "source", "campaign", "tracking"
+]);
+export function canonicalSourceIdentity(sourceUrl: string): string {
+  const url = new URL(sourceUrl);
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const path = url.pathname.replace(/\/+$/, "") || "/";
+  const params = new URLSearchParams(url.search);
+  for (const key of [...params.keys()]) {
+    if (trackingParams.has(key.toLowerCase()) || key.toLowerCase().startsWith("utm_")) params.delete(key);
+  }
+  params.sort();
+  return host + (url.port ? ":" + url.port : "") + path + (params.size ? "?" + params.toString() : "");
+}
 export function sanitizeSearchResults(results: SearchResult[], limit = 8): SearchResult[] {
   const seen = new Set<string>();
-  return results.filter((result) => {
-    if (!isSafeSourceUrl(result.url)) return false;
-    const url = new URL(result.url);
-    const identity = `${url.hostname.toLowerCase()}${url.pathname.replace(/\/$/, "")}`;
-    if (seen.has(identity)) return false;
+  const sanitized: SearchResult[] = [];
+  for (const result of results) {
+    if (!result || typeof result !== "object" || !isSafeSourceUrl(result.url)) continue;
+    const identity = canonicalSourceIdentity(result.url);
+    if (seen.has(identity)) continue;
     seen.add(identity);
-    return true;
-  }).slice(0, limit);
+    sanitized.push(result);
+    if (sanitized.length >= limit) break;
+  }
+  return sanitized;
 }
 /**
  * Heuristic retrieval ordering: relevance is necessary, authority adds context.
@@ -75,6 +97,37 @@ export function validateAssessment(value: unknown, sources: SearchResult[]): Ass
   return { claim: input.claim.trim().slice(0, 400), verdict, explanation: input.explanation.trim().slice(0, 1200), sourceIndices, evidenceStrength, qualifications: typeof input.qualifications === "string" ? input.qualifications.slice(0,600) : undefined, sourceAssessments };
 }
 export function sourcesFor(indices: number[], sources: SearchResult[], assessments: SourceAssessment[] = []): Evidence[] { const output:Evidence[]=[];for(const index of indices){const source=sources[index];if(!source||!isSafeSourceUrl(source.url))continue;const review=assessments.find(item=>item.index===index);output.push({title:source.title?.trim().slice(0,240)||"Untitled source",url:source.url,snippet:source.content?.trim().slice(0,500)||"No excerpt supplied by Tavily.",sourceIndex:index,publisher:publisherFor(source.url),publishedDate:typeof source.published_date==="string"?source.published_date.slice(0,50):undefined,sourceType:categorizeSource(source),relationship:review?.relationship,relevance:review?.relevance,limitations:review?.limitations});}return output; }
-export function isSafeSourceUrl(value: unknown): value is string { try { const url = new URL(String(value)); const host = url.hostname.toLowerCase(); return url.protocol === "https:" && !url.username && !url.password && host !== "localhost" && !host.endsWith(".local") && !/^\d{1,3}(\.\d{1,3}){3}$/.test(host); } catch { return false; } }
-export function publisherFor(url:string){return new URL(url).hostname.replace(/^www\./,"");}
-export function categorizeSource(source:SearchResult):SourceType{const host=isSafeSourceUrl(source.url)?new URL(source.url).hostname.toLowerCase():"";const text=`${source.title||""} ${source.content||""}`.toLowerCase();if(/instagram|facebook|tiktok|reddit|x\.com|twitter\.com/.test(host))return "social_media";if(/\.gov$|\.int$|\.edu$/.test(host)||/official documentation|technical documentation|dataset/.test(text))return "primary";if(/arxiv\.org|pubmed|doi\.org|journal|university research/.test(host+text))return "academic";if(/news|reuters|apnews|bbc|theguardian|nytimes/.test(host))return "established_reporting";if(/blog|opinion|forum|brainly/.test(host+text))return "commentary";return "unknown";}
+import { isIP } from "node:net";
+
+/** Public HTTPS citation destinations only; do not render local/private links. */
+export function isSafeSourceUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 2048) return false;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
+    const unbracketed = host.replace(/^\[/, "").replace(/\]$/, "");
+    if (url.protocol !== "https:" || url.username || url.password || !host || isIP(unbracketed) !== 0) return false;
+    if (host === "localhost" || /\.(?:localhost|local|internal|lan|home|test|invalid)$/.test(host)) return false;
+    return true;
+  } catch { return false; }
+}
+export function publisherFor(url: string) { return new URL(url).hostname.replace(/^www\./, ""); }
+const domainOrSubdomain = (host: string, domain: string) => host === domain || host.endsWith("." + domain);
+/**
+ * Source categories describe the publisher's domain, NOT the authority of the
+ * excerpt. A third-party page cannot earn institutional status just by saying
+ * "official documentation", "dataset", or "university research".
+ */
+export function categorizeSource(source: SearchResult): SourceType {
+  if (!isSafeSourceUrl(source.url)) return "unknown";
+  const host = new URL(source.url).hostname.toLowerCase().replace(/\.$/, "");
+  const isOneOf = (domains: string[]) => domains.some(domain => domainOrSubdomain(host, domain));
+  if (isOneOf(["instagram.com", "facebook.com", "tiktok.com", "reddit.com", "x.com", "twitter.com", "threads.net", "youtube.com"])) return "social_media";
+  // Source kind is an imperfect discovery heuristic, not an accuracy score.
+  if (host.endsWith(".gov") || host.endsWith(".int") ||
+      isOneOf(["gov.uk", "gov.au", "gov.nz", "europa.eu"])) return "primary";
+  if (host.endsWith(".edu") || isOneOf(["arxiv.org", "doi.org", "pubmed.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov"])) return "academic";
+  if (isOneOf(["reuters.com", "apnews.com", "bbc.com", "bbc.co.uk", "theguardian.com", "nytimes.com", "ft.com", "npr.org"])) return "established_reporting";
+  if (isOneOf(["medium.com", "substack.com", "wordpress.com", "blogspot.com", "brainly.in", "quora.com"])) return "commentary";
+  return "unknown";
+}

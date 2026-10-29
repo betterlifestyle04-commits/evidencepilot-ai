@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseClaims, parseJsonObject, rankSearchResults, sanitizeSearchResults, sourcesFor, validateAssessment } from "../lib/evidence";
+import { categorizeSource, parseClaims, parseJsonObject, rankSearchResults, sanitizeSearchResults, sourcesFor, validateAssessment, type SearchResult } from "../lib/evidence";
 test("parses, de-duplicates, and caps claims at three",()=>{const claims=parseClaims(["A verifiable claim is here.","A verifiable claim is here.","Another claim with enough text.","Third claim with enough text.","Fourth claim with enough text."]);assert.equal(claims.length,3);});
 test("accepts a fenced compatible JSON fallback",()=>assert.equal(parseJsonObject("```json\n{\"ok\":true}\n``` ").ok,true));
 test("never permits supported without a cited retrieved URL",()=>{const sources=[{title:"Good",url:"https://example.com",content:"Excerpt"},{title:"Bad",url:"javascript:alert(1)",content:"No"}];const assessment=validateAssessment({claim:"A claim long enough",verdict:"supported",explanation:"The result supports it.",sourceIndices:[1]},sources);assert.equal(assessment.verdict,"insufficient_evidence");assert.equal(sourcesFor(assessment.sourceIndices,sources).length,0);});
@@ -62,4 +62,50 @@ test("keeps directly supported verdicts with aligned cited relationships",()=>{
   const sources=[{title:"Direct",url:"https://example.org/primary",content:"Direct evidence"}];
   const item=validateAssessment({claim:"A checkable statement",verdict:"supported",explanation:"The source supports it",sourceIndices:[0],sourceAssessments:[{index:0,relationship:"supports",relevance:"Direct",limitations:"Excerpt only"}]},sources);
   assert.equal(item.verdict,"supported");
+});
+
+test("preserves distinct query-identified pages while dropping tracking-only duplicates",()=>{
+  const results=sanitizeSearchResults([
+    {url:"https://youtube.com/watch?v=videoA",title:"First video"},
+    {url:"https://youtube.com/watch?v=videoB",title:"Second video"},
+    {url:"https://youtube.com/watch?v=videoA&utm_source=share",title:"Tracked duplicate"},
+    {url:"https://example.org/article?id=123",title:"Article 123"},
+    {url:"https://example.org/article?id=456",title:"Article 456"},
+    {url:"https://example.org/article?id=123&fbclid=tracker",title:"Duplicated article"}
+  ]);
+  assert.deepEqual(results.map(x=>x.title),["First video","Second video","Article 123","Article 456"]);
+});
+test("tracking parameter order and trailing slash do not create extra citations",()=>{
+  const sources=sanitizeSearchResults([
+    {url:"https://example.org/record/?utm_campaign=launch&id=42",title:"Original"},
+    {url:"https://example.org/record?id=42&utm_source=newsletter",title:"Tracked alternate"},
+    {url:"https://example.org/record?id=43",title:"Separate record"}
+  ]);
+  assert.deepEqual(sources.map(x=>x.title),["Original","Separate record"]);
+});
+test("does not promote unrelated pages because their excerpts contain authority keywords",()=>{
+  const sources=[
+    {url:"https://untrusted.example.org/post",title:"Official documentation and NASA dataset",content:"University research on climate science"},
+    {url:"https://evil-reuters.com/story",title:"Reuters report",content:"Official technical documentation"},
+    {url:"https://science.nasa.gov/solar-system/",title:"Solar System",content:"A planetary overview"},
+    {url:"https://reuters.com/world/report",title:"News",content:"Current reporting"},
+    {url:"https://arxiv.org/abs/1234.56789",title:"Research",content:"A preprint"},
+    {url:"https://brainly.in/question/1234",title:"User answer",content:"Claim text"}
+  ];
+  assert.deepEqual(sources.map(categorizeSource),["unknown","unknown","primary","established_reporting","academic","commentary"]);
+});
+test("hostnames resembling social media or news domains cannot spoof publisher class",()=>{
+  assert.equal(categorizeSource({url:"https://notinstagram.com/post"}),"unknown");
+  assert.equal(categorizeSource({url:"https://reuters.com.evil.org/story"}),"unknown");
+  assert.equal(categorizeSource({url:"https://news.reuters.com/story"}),"established_reporting");
+});
+test("discards private address destinations, credential URLs and malformed search results",()=>{
+  const sources=sanitizeSearchResults([
+    {url:"https://[::1]/private"},{url:"https://10.0.0.1/private"},
+    {url:"https://test.internal/notes"},{url:"https://user:pw@example.org/a"},
+    {url:"https://example.org/"+"a".repeat(2050)},
+    null as unknown as SearchResult,
+    {url:"https://science.nasa.gov/jupiter/",title:"NASA"}
+  ]);
+  assert.deepEqual(sources.map(x=>x.title),["NASA"]);
 });

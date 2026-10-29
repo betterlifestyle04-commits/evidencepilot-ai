@@ -28,3 +28,10 @@ Nemotron returns `strong`, `moderate`, `limited`, or `insufficient` evidence str
 ## Known limitations
 
 Search ranking can omit decisive material, source categories are fallible, text excerpts can lack context, and generated assessments can be wrong. Time-sensitive claims require especially careful review. Users must open and assess original sources before publishing conclusions.
+
+
+## Source category and URL hardening (October 2026)
+
+Source categories are assigned using explicitly matched publisher domains and registrable-domain boundaries, never keywords found in titles or excerpts. Thus a page describing itself as "official documentation" cannot gain primary-source priority by that phrase alone. The primary/academic/reporting categories remain fallible source-discovery heuristics, not independent verification or approval of the article's content.
+
+Deduplication retains query parameters used to identify distinct documents and videos, such as `?id=` and `?v=`, while discarding known tracking-only parameters such as `utm_*` and `fbclid` for comparison. Original source URLs are preserved for display. Non-HTTPS URLs, host IP literals, local domain suffixes, URLs containing credentials, oversized source URLs and invalid result entries are rejected before inclusion in AI evidence catalogs.
