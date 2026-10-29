@@ -99,3 +99,14 @@ test("returns original text when the optional rewrite service fails", async () =
   assert.equal(report.rewrite, input);
   assert.equal(report.investigation.rewriteStatus, "unavailable");
 });
+
+test("investigation duration includes claim extraction",async()=>{
+  const report = await analyzeContent("Jupiter is the largest planet.",{
+    extractClaims: async()=>{await new Promise(resolve=>setTimeout(resolve,30));return ["Jupiter is the largest planet."];},
+    planClaim: async claim=>plan(claim),
+    searchClaim: async()=>[{title:"NASA",url:"https://science.nasa.gov/jupiter/",content:"Jupiter is the largest planet."}],
+    assess: async claim=>({claim,verdict:"supported",explanation:"Evidence supports this claim.",sourceIndices:[0]}),
+    cautiousRewrite: async()=> "Jupiter is the largest planet."
+  },"quick");
+  assert.ok(report.investigation.durationMs >= 25,"elapsed time must include slow claim extraction");
+});

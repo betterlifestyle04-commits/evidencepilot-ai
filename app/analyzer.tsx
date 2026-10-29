@@ -223,11 +223,10 @@ export default function Analyzer() {
     requestInFlight.current = true;
     setBusy(true);
     setSuggestQuick(false);
-    setImportedReport(false);
+    // Keep the last successful report accessible during retries and on failure.
     setElapsedSeconds(0);
     setError("");
     setNotice("");
-    setReport(null);
     const submitted = content;
     try {
       const response = await fetch("/api/analyze", {
@@ -257,6 +256,7 @@ export default function Analyzer() {
       setEditorialDraft(payload.rewrite);
       setEditorialDecisions(newEditorialReview(payload.claims.length, payload.rewrite).decisions);
       setCompletedAt(new Date().toISOString());
+      setImportedReport(false);
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
     } catch (caught) {
@@ -354,19 +354,21 @@ export default function Analyzer() {
               <p>Reopen a previously exported investigation, including your notes and review checklist. This happens entirely in your browser and uses no AI credits.</p>
             </div>
             <div className="mode-selector" role="group" aria-label="Choose investigation depth">
-              <button type="button" aria-pressed={mode === "quick"} className={"mode-option" + (mode === "quick" ? " selected" : "")} onClick={() => { setMode("quick"); setReport(null); }} disabled={busy}>
+              <button type="button" aria-pressed={mode === "quick"} className={"mode-option" + (mode === "quick" ? " selected" : "")} onClick={() => { setMode("quick"); setError(""); }} disabled={busy}>
                 <span className="mode-title">Quick Check</span>
                 <span className="mode-description">Fewer AI calls · Basic search · Designed for speed</span>
               </button>
-              <button type="button" aria-pressed={mode === "deep"} className={"mode-option" + (mode === "deep" ? " selected" : "")} onClick={() => { setMode("deep"); setReport(null); }} disabled={busy}>
+              <button type="button" aria-pressed={mode === "deep"} className={"mode-option" + (mode === "deep" ? " selected" : "")} onClick={() => { setMode("deep"); setError(""); }} disabled={busy}>
                 <span className="mode-title">Deep Investigation</span>
                 <span className="mode-description">Research plans · Advanced search · Optional follow-up</span>
               </button>
             </div>
             <div className="input-divider" />
             <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : waitSeconds > 0 ? <>Retry in {waitSeconds}s</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
+            {busy && report && <p className="previous-report-note" role="status">Your previous report remains available below while a new analysis runs. It is not a result of the new request.</p>}
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Live {mode === "deep" ? "deep investigation" : "quick check"} in progress. <span className="busy-duration" aria-hidden="true">{elapsedSeconds}s elapsed.</span> Provider requests may take some time; this is a real timer, not simulated research stages.</div>}
             {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span>
+              {report && <span>Your last completed report is still available below and was not updated by this failed request.</span>}
               {waitSeconds > 0 && <span className="retry-countdown" role="status">Next allowed attempt in approximately {waitSeconds} seconds. The public demo is rate limited to protect provider credits.</span>}
               {suggestQuick && mode === "deep" && <button type="button" className="retry-quick-button" onClick={() => { setMode("quick"); setSuggestQuick(false); setError(""); }} disabled={busy}>Switch to Quick Check (does not submit automatically)</button>}
             </div>}
@@ -403,6 +405,7 @@ export default function Analyzer() {
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
           <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          {!busy && !error && report.mode !== mode && !importedReport && <p className="previous-report-note">This saved result used {report.mode === "deep" ? "Deep Investigation" : "Quick Check"}. The selected mode applies only to your next request.</p>}
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
           {(report.investigation?.partialClaims || report.investigation?.rewriteStatus === "unavailable") && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
