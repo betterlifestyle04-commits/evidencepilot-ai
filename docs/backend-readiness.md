@@ -4,6 +4,8 @@
 
 `npm test`, `npm run lint`, and `npm run build` run without provider credentials. The API route targets the Node.js runtime and exports `maxDuration = 60`, which is suitable for Vercel plans that allow a 60-second function duration.
 
+Set `MAX_ANALYSIS_DURATION_MS` below the Vercel function duration (default 50 seconds; accepted range 5–55 seconds). When the remaining budget is exhausted after claim extraction, the backend returns an honest partial report where possible; if extraction itself exceeds the budget, it returns a sanitized 504 response. This avoids waiting until Vercel force-terminates the request.
+
 `GET /api/health` is a non-cached, non-secret readiness endpoint. It reports `ready` only when provider and shared-rate-limit bindings are present, otherwise `degraded`; it never validates keys or reveals values. Do not treat its `integrations: "unverified"` response as proof that providers work. Every analysis response includes a random `requestId` and matching `X-Request-Id` header for support correlation, without logging or exposing provider details.
 
 ## Required production configuration

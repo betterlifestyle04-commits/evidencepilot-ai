@@ -99,3 +99,16 @@ test("returns original text when the optional rewrite service fails", async () =
   assert.equal(report.rewrite, input);
   assert.equal(report.investigation.rewriteStatus, "unavailable");
 });
+test("returns a bounded partial report before the function deadline", async () => {
+  const input = "A factual statement that needs review.";
+  const report = await analyzeContent(input, {
+    extractClaims: async () => ["A factual statement that needs review."],
+    planClaim: async () => new Promise(() => {}),
+    searchClaim: async () => { throw new Error("should not run after deadline"); },
+    assess: async () => { throw new Error("should not run after deadline"); },
+    cautiousRewrite: async () => "Should not run after deadline"
+  }, "deep", 20);
+  assert.equal(report.claims[0].retrievalStatus, "unavailable");
+  assert.equal(report.rewrite, input);
+  assert.equal(report.investigation.deadlineReached, true);
+});

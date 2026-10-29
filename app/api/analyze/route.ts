@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeContent, type AnalysisMode } from "@/lib/analyze";
+import { AnalysisDeadlineError, analyzeContent, type AnalysisMode } from "@/lib/analyze";
 import * as providers from "@/lib/providers";
 import { ProviderError } from "@/lib/providers";
 import { checkRateLimit, rateLimitInfo } from "@/lib/rate-limit";
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     const report = await analyzeContent(content, providers, mode as AnalysisMode);
     return response({ ...report, model: process.env.NEBIUS_MODEL || "nvidia/nemotron-3-super-120b-a12b" }, 200, id);
   } catch (error) {
+    if (error instanceof AnalysisDeadlineError) return response({ error: "Analysis timed out. Please retry with a shorter input or Quick Check." }, 504, id);
     if (error instanceof ProviderError) return response({
       error: error.kind === "configuration" ? "Provider configuration is incomplete."
         : error.kind === "timeout" ? "A provider timed out. Please try again."

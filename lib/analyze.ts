@@ -2,6 +2,7 @@ import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor,
 import { ProviderError, type ResearchPlan } from "./providers";
 
 export type AnalysisMode = "quick" | "deep";
+export class AnalysisDeadlineError extends Error { constructor(){super("Analysis exceeded its time budget.");} }
 export type AnalysisProviders = {
   extractClaims(content: string): Promise<string[]>;
   planClaim(claim: string): Promise<ResearchPlan>;
@@ -24,12 +25,21 @@ const searchBudget = () => Math.min(2, Math.max(1, Number.parseInt(process.env.M
 const needsFollowup = (sources: SearchResult[]) =>
   sources.length < 2 || sources.every(source => ["social_media", "commentary", "unknown"].includes(categorizeSource(source)));
 
-export async function analyzeContent(content: string, providers: AnalysisProviders, mode: AnalysisMode = "deep") {
-  const claims = await providers.extractClaims(content);
+const configuredDuration = () => Math.min(55_000, Math.max(5_000, Number.parseInt(process.env.MAX_ANALYSIS_DURATION_MS || "50000", 10) || 50_000));
+export async function analyzeContent(content: string, providers: AnalysisProviders, mode: AnalysisMode = "deep", durationMs = configuredDuration()) {
+  const started = Date.now();
+  let deadlineReached = false;
+  const withinDeadline = async <T,>(task: () => Promise<T>): Promise<T> => {
+    const remaining = durationMs - (Date.now() - started);
+    if (deadlineReached || remaining <= 0) { deadlineReached = true; throw new AnalysisDeadlineError(); }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try { return await Promise.race([task(), new Promise<T>((_, reject) => { timer = setTimeout(() => { deadlineReached = true; reject(new AnalysisDeadlineError()); }, remaining); })]); }
+    finally { if (timer) clearTimeout(timer); }
+  };
+  const claims = await withinDeadline(() => providers.extractClaims(content));
   if (!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
 
   let nebiusCalls = 1, tavilyCalls = 0, followupSearches = 0;
-  const started = Date.now();
   const queryCache = new Map<string, Promise<SearchResult[]>>();
   const retrieve = (query: string) => {
     const key = query.trim().toLowerCase();
@@ -55,7 +65,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     } else {
       try {
         nebiusCalls++;
-        plan = await providers.planClaim(claim);
+        plan = await withinDeadline(() => providers.planClaim(claim));
       } catch (error) {
         if (error instanceof ProviderError && error.kind === "configuration") throw error;
         plan = fallbackPlan(claim);
@@ -63,7 +73,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     }
     let results: SearchResult[];
     try {
-      results = await retrieve(plan.queries[0] || claim + " official documentation");
+      results = await withinDeadline(() => retrieve(plan.queries[0] || claim + " official documentation"));
     } catch (error) {
       if (error instanceof ProviderError && error.kind === "configuration") throw error;
       return {
@@ -76,7 +86,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     if (mode === "deep" && searchBudget() > 1 && needsFollowup(results) && plan.queries[1]) {
       followupSearches++;
       try {
-        results = sanitizeSearchResults([...results, ...await retrieve(plan.queries[1])]);
+        results = sanitizeSearchResults([...results, ...await withinDeadline(() => retrieve(plan.queries[1]))]);
       } catch (error) {
         if (error instanceof ProviderError && error.kind === "configuration") throw error;
         // A failed optional search must not erase the successful first search.
@@ -91,7 +101,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
 
     nebiusCalls++;
     try {
-      const assessment = await providers.assess(plan.normalizedClaim, results, plan);
+      const assessment = await withinDeadline(() => providers.assess(plan.normalizedClaim, results, plan));
       return {
         ...assessment,
         sources: sourcesFor(assessment.sourceIndices, results, assessment.sourceAssessments),
@@ -118,7 +128,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
   let rewrite = content;
   let rewriteStatus: "unavailable" | undefined;
   try {
-    rewrite = await providers.cautiousRewrite(content, reviewed);
+    rewrite = await withinDeadline(() => providers.cautiousRewrite(content, reviewed));
   } catch (error) {
     if (error instanceof ProviderError && error.kind === "configuration") throw error;
     rewriteStatus = "unavailable";
@@ -133,7 +143,8 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
       uniqueSearches: tavilyCalls,
       followupSearches,
       partialClaims: reviewed.filter(claim => claim.retrievalStatus).length,
-      rewriteStatus
+      rewriteStatus,
+      deadlineReached
     }
   };
 }
