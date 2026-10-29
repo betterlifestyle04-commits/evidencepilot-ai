@@ -126,3 +126,54 @@ test("opinion-only text returns a typed no-claims outcome without performing sea
   }, "quick"), (error: unknown) => error instanceof NoCheckableClaimsError);
   assert.equal(searches, 0);
 });
+
+
+test("deep investigation anchors the assessed, ranked, and displayed claim to the extracted wording",async()=>{
+  const original="Mars is the biggest planet in the Solar System.";
+  const plannerRewrite="Jupiter is the biggest planet in the Solar System.";
+  const assessed:string[]=[];
+  const report=await analyzeContent(original,{
+    extractClaims:async()=>[original],
+    planClaim:async()=>({
+      ...plan(original),normalizedClaim:plannerRewrite,
+      queries:["solar system largest planet NASA"]
+    }),
+    searchClaim:async()=>[{
+      title:"Mars and Jupiter in the Solar System",
+      url:"https://science.nasa.gov/solar-system/",
+      content:"Jupiter is the largest planet, not Mars."
+    }],
+    assess:async claim=>{
+      assessed.push(claim);
+      // Deliberately return a changed claim: the server must not adopt it.
+      return {
+        claim:"Jupiter is the largest planet, which is true.",
+        verdict:"contradicted",explanation:"Source contradicts the exact Mars claim.",
+        sourceIndices:[0]
+      };
+    },
+    cautiousRewrite:async()=> "Mars is not the largest planet."
+  },"deep");
+  assert.deepEqual(assessed,[original]);
+  assert.equal(report.claims[0].claim,original);
+  assert.equal(report.claims[0].researchPlan?.normalizedClaim,plannerRewrite);
+  assert.equal(report.claims[0].verdict,"contradicted");
+});
+test("retrieval and assessment failure preserve the extracted claim, never planner wording",async()=>{
+  const original="The Moon is bigger than Earth.";
+  const drift="The Moon is smaller than Earth.";
+  for(const failAt of ["retrieve","assess"] as const) {
+    const report=await analyzeContent(original,{
+      extractClaims:async()=>[original],
+      planClaim:async()=>({...plan(original),normalizedClaim:drift,queries:["Moon size Earth"]}),
+      searchClaim:async()=>failAt==="retrieve"
+        ? Promise.reject(new Error("offline search"))
+        : [{title:"Moon size",url:"https://science.nasa.gov/moon/",content:"Relative sizes."}],
+      assess:async()=>{throw new Error("assessment failed");},
+      cautiousRewrite:async()=> "Original text."
+    },"deep");
+    assert.equal(report.claims[0].claim,original);
+    assert.equal(report.claims[0].verdict,"insufficient_evidence");
+    assert.equal(report.claims[0].researchPlan?.normalizedClaim,drift);
+  }
+});

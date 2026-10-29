@@ -73,7 +73,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     } catch (error) {
       if (error instanceof ProviderError && error.kind === "configuration") throw error;
       return {
-        claim: plan.normalizedClaim, verdict: "insufficient_evidence",
+        claim, verdict: "insufficient_evidence",
         explanation: "Evidence retrieval was temporarily unavailable for this claim, so no conclusion can be supported.",
         sourceIndices: [], sources: [], retrievalStatus: "unavailable", researchPlan: planSummary(plan)
       };
@@ -88,25 +88,29 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
         // A failed optional search must not erase the successful first search.
       }
     }
-    results = rankSearchResults(sanitizeSearchResults(results), plan.normalizedClaim);
+    // Rank against the user's extracted claim, not a possibly drifted research paraphrase.
+    results = rankSearchResults(sanitizeSearchResults(results), claim);
     if (!results.length) return {
-      claim: plan.normalizedClaim, verdict: "insufficient_evidence",
+      claim, verdict: "insufficient_evidence",
       explanation: "No usable public sources were retrieved for this claim, so no conclusion can be supported.",
       sourceIndices: [], sources: [], retrievalStatus: "empty", researchPlan: planSummary(plan)
     };
 
     nebiusCalls++;
     try {
-      const assessment = await providers.assess(plan.normalizedClaim, results, plan);
+      // The research planner and assessor are not allowed to replace the claim
+      // that the extractor originally identified. The plan remains metadata.
+      const assessment = await providers.assess(claim, results, { ...plan, normalizedClaim: claim });
       return {
         ...assessment,
+        claim,
         sources: sourcesFor(assessment.sourceIndices, results, assessment.sourceAssessments),
         researchPlan: planSummary(plan)
       };
     } catch (error) {
       if (error instanceof ProviderError && error.kind === "configuration") throw error;
       return {
-        claim: plan.normalizedClaim, verdict: "insufficient_evidence",
+        claim, verdict: "insufficient_evidence",
         explanation: "Evidence was retrieved, but the assessment service was temporarily unavailable, so no conclusion can be supported.",
         // Retain real retrieved URLs for human inspection, without misrepresenting
         // them as model-cited evidence or assigning a support relationship.

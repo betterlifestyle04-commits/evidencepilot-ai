@@ -35,3 +35,10 @@ Search ranking can omit decisive material, source categories are fallible, text 
 Source categories are assigned using explicitly matched publisher domains and registrable-domain boundaries, never keywords found in titles or excerpts. Thus a page describing itself as "official documentation" cannot gain primary-source priority by that phrase alone. The primary/academic/reporting categories remain fallible source-discovery heuristics, not independent verification or approval of the article's content.
 
 Deduplication retains query parameters used to identify distinct documents and videos, such as `?id=` and `?v=`, while discarding known tracking-only parameters such as `utm_*` and `fbclid` for comparison. Original source URLs are preserved for display. Non-HTTPS URLs, host IP literals, local domain suffixes, URLs containing credentials, oversized source URLs and invalid result entries are rejected before inclusion in AI evidence catalogs.
+
+
+## Claim fidelity and verdict consistency (October 29, 2026)
+
+Deep Investigation research plans can suggest an alternate normalization of a claim, and models can paraphrase the claim in their assessment response. Neither is allowed to silently replace the extracted claim: searches are ranked for the original extracted wording, the assessment receives that exact wording, and the report keeps it even if a plan, assessment or provider fallback proposes different text. Planner-suggested wording remains visible as contextual metadata, not as the statement being verified.
+
+When deterministic evidence safeguards reduce a model's decisive assessment to `insufficient_evidence` (missing valid citations or incompatible source relationships), the original potentially confident explanation is replaced with a neutral safeguard explanation rather than being displayed alongside the downgraded verdict. Source citations remain available for human inspection. This does not independently validate model claims or guarantee search relevance.

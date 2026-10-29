@@ -59,7 +59,7 @@ export function ResearchReasoning({ claim }: { claim: ClaimInsight }) {
     {plan && <details className="investigation-details"><summary>How this claim was investigated</summary>
       <p><strong>Research objective:</strong> {plan.evidenceNeeded}</p>
       {plan.entities?.length > 0 && <p><strong>Relevant entities:</strong> {plan.entities.join(", ")}</p>}
-      {plan.normalizedClaim !== claim.claim && <p><strong>Normalized claim:</strong> {plan.normalizedClaim}</p>}
+      {plan.normalizedClaim !== claim.claim && <p><strong>Planner-suggested wording (not substituted for the assessed claim):</strong> {plan.normalizedClaim}</p>}
     </details>}
   </div>;
 }
