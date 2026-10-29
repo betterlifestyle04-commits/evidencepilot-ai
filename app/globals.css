@@ -239,3 +239,6 @@
 .retry-quick-button{width:fit-content;max-width:100%;margin-top:8px;border:1px solid #d8c8c0;color:#8a4230;background:#fff;padding:9px 13px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}
 .retry-quick-button:hover{background:#fff7f3}
 .retry-quick-button:focus-visible{outline:2px solid #984b38;outline-offset:2px}
+
+.previous-report-note{font-size:12px;line-height:1.7;color:#42647c;background:#f1f7fb;border:1px solid #d6e5f0;padding:12px 15px;border-radius:10px;margin:12px 0}
+@media print{.previous-report-note{display:none!important}}

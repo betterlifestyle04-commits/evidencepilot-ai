@@ -25,11 +25,12 @@ const needsFollowup = (sources: SearchResult[]) =>
   sources.length < 2 || sources.every(source => ["social_media", "commentary", "unknown"].includes(categorizeSource(source)));
 
 export async function analyzeContent(content: string, providers: AnalysisProviders, mode: AnalysisMode = "deep") {
+  // Full request latency includes the model's claim-extraction stage.
+  const started = Date.now();
   const claims = await providers.extractClaims(content);
   if (!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
 
   let nebiusCalls = 1, tavilyCalls = 0, followupSearches = 0;
-  const started = Date.now();
   const queryCache = new Map<string, Promise<SearchResult[]>>();
   const retrieve = (query: string) => {
     const key = query.trim().toLowerCase();
