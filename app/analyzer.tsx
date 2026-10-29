@@ -8,6 +8,7 @@ type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
 type AnalysisMode = "quick" | "deep";
 type Claim = ClaimInsight;
 type Report = { claims: Claim[]; rewrite: string; model: string; mode?: AnalysisMode; providerCalls?: { nebius: number; tavily: number; total: number }; investigation?: InvestigationSummary };
+type ServiceStatus = "checking" | "ready" | "degraded" | "unavailable";
 
 const verdicts: Record<Verdict, { label: string; short: string }> = {
   supported: { label: "Supported", short: "Supported" },
@@ -94,6 +95,7 @@ export default function Analyzer() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [expandedGuide, setExpandedGuide] = useState(false);
+  const [serviceStatus, setServiceStatus] = useState<ServiceStatus>("checking");
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
@@ -108,6 +110,17 @@ export default function Analyzer() {
     return () => clearInterval(interval);
   }, [busy]);
 
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/health", { cache: "no-store" })
+      .then(async response => {
+        const health = await response.json() as { status?: unknown };
+        if (active) setServiceStatus(health.status === "ready" ? "ready" : "degraded");
+      })
+      .catch(() => { if (active) setServiceStatus("unavailable"); });
+    return () => { active = false; };
+  }, []);
+
   function toggleReviewedSource(url: string) {
     setReviewedUrls(previous => previous.includes(url) ? previous.filter(item => item !== url) : [...previous, url]);
   }
@@ -118,6 +131,11 @@ export default function Analyzer() {
     setError("");
     setNotice("Sample claim loaded. Select Analyze to perform a live evidence review.");
     document.getElementById("content")?.focus();
+  }
+
+  function startAnotherAnalysis() {
+    document.getElementById("workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => document.getElementById("content")?.focus(), 350);
   }
 
   async function importTextFile(file: File | undefined) {
@@ -271,6 +289,10 @@ export default function Analyzer() {
                 <span className="mode-description">Research plans · Advanced search · Optional follow-up</span>
               </button>
             </div>
+            <div className="analysis-brief" aria-live="polite">
+              <div><span className="brief-icon" aria-hidden="true">⌁</span><div><strong>{mode === "quick" ? "Focused evidence pass" : "Layered evidence investigation"}</strong><p>{mode === "quick" ? "Extracts up to three factual claims and runs one live search per claim when available." : "Builds a research plan for each claim and may add a second search when initial evidence is thin."}</p></div></div>
+              <span className="brief-status">{serviceStatus === "ready" ? "Service configured" : serviceStatus === "checking" ? "Checking service" : serviceStatus === "degraded" ? "Setup required" : "Service unavailable"}</span>
+            </div>
             <div className="input-divider" />
             <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Live {mode === "deep" ? "deep investigation" : "quick check"} in progress. <span className="busy-duration" aria-hidden="true">{elapsedSeconds}s elapsed.</span> Provider requests may take some time; this is a real timer, not simulated research stages.</div>}
@@ -302,12 +324,18 @@ export default function Analyzer() {
             <button type="button" className="guide-button" onClick={() => setExpandedGuide(!expandedGuide)} aria-expanded={expandedGuide} aria-controls="trust-explainer">Why these categories? <span aria-hidden="true">{expandedGuide ? "−" : "+"}</span></button>
             {expandedGuide && <p id="trust-explainer" className="guide-copy">A web search result is not proof by itself. These assessments reflect the material retrieved, can miss important sources, and must be independently reviewed.</p>}
           </div>
+          <div className="side-card platform-card" aria-live="polite">
+            <span className="side-eyebrow">PLATFORM STATUS</span>
+            <div className="platform-status-line"><i className={"status-orb status-" + serviceStatus} /><strong>{serviceStatus === "ready" ? "Analysis service configured" : serviceStatus === "checking" ? "Checking workspace" : serviceStatus === "degraded" ? "Secure setup needed" : "Status check unavailable"}</strong></div>
+            <p>{serviceStatus === "ready" ? "Secure server bindings are present. Provider behavior still depends on each live request." : serviceStatus === "checking" ? "Checking non-secret server readiness…" : "This workspace cannot run live analysis until its server-side provider and rate-limit configuration is complete."}</p>
+            <span className="platform-privacy">No API keys are sent to your browser.</span>
+          </div>
         </aside>
       </section>
 
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
-          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={startAnotherAnalysis}>New analysis</button><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
