@@ -233,3 +233,9 @@
 .partial-result-notice,.partial-rewrite-warning{background:#fff8e8;border:1px solid #ead7a4;border-radius:10px;color:#765623;padding:14px 17px;font-size:12px;line-height:1.75;margin:15px 0}
 .partial-result-notice strong{font-weight:800}
 .partial-rewrite-warning{margin:13px 0 0}
+
+/* Hackathon demo recovery: transparent rate-limit and provider failure guidance */
+.retry-countdown{display:block;padding:10px 12px;background:#fff8ed;border:1px solid #f2dcc5;border-radius:8px;color:#83552f;font-size:12px;font-weight:700}
+.retry-quick-button{width:fit-content;max-width:100%;margin-top:8px;border:1px solid #d8c8c0;color:#8a4230;background:#fff;padding:9px 13px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer}
+.retry-quick-button:hover{background:#fff7f3}
+.retry-quick-button:focus-visible{outline:2px solid #984b38;outline-offset:2px}

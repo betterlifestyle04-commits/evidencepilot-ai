@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { analysisFailure } from "./analysis-feedback";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
@@ -97,6 +98,10 @@ export default function Analyzer() {
   const [content, setContent] = useState("");
   const [report, setReport] = useState<Report | null>(null);
   const [busy, setBusy] = useState(false);
+  const requestInFlight = useRef(false);
+  const [retryUntil, setRetryUntil] = useState<number | null>(null);
+  const [timerNow, setTimerNow] = useState(() => Date.now());
+  const [suggestQuick, setSuggestQuick] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewedUrls, setReviewedUrls] = useState<string[]>([]);
   const [sourceNotes, setSourceNotes] = useState<Record<string, string>>({});
@@ -111,7 +116,8 @@ export default function Analyzer() {
   const [expandedGuide, setExpandedGuide] = useState(false);
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
-  const canAnalyze = content.trim().length >= 20 && !busy;
+  const waitSeconds = retryUntil ? Math.max(0, Math.ceil((retryUntil - timerNow) / 1000)) : 0;
+  const canAnalyze = content.trim().length >= 20 && !busy && waitSeconds === 0;
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes, editorialDraft, editorialDecisions) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
@@ -119,6 +125,16 @@ export default function Analyzer() {
   useEffect(() => {
     if (report) document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [report]);
+
+  useEffect(() => {
+    if (!retryUntil) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setTimerNow(now);
+      if (now >= retryUntil) setRetryUntil(null);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [retryUntil]);
 
   useEffect(() => {
     if (!busy) return;
@@ -203,8 +219,10 @@ export default function Analyzer() {
   }
 
   async function analyze() {
-    if (!canAnalyze) return;
+    if (!canAnalyze || requestInFlight.current) return;
+    requestInFlight.current = true;
     setBusy(true);
+    setSuggestQuick(false);
     setImportedReport(false);
     setElapsedSeconds(0);
     setError("");
@@ -215,16 +233,20 @@ export default function Analyzer() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: submitted, mode })
+        body: JSON.stringify({ content: submitted, mode }),
+        signal: AbortSignal.timeout(75_000)
       });
       const data: unknown = await response.json();
       const payload = data as Partial<Report> & { error?: string; requestId?: string };
       if (!response.ok) {
-        const idSuffix = typeof payload.requestId === "string" && /^[0-9a-f-]{36}$/i.test(payload.requestId) ? " (Request ID: " + payload.requestId + ")" : "";
-        if (response.status === 503 && payload.error === "Provider configuration is incomplete.") {
-          throw new Error("Live analysis has not been connected yet. Check the secure Nebius and Tavily API configuration." + idSuffix);
+        const feedback = analysisFailure(response.status, payload, response.headers.get("retry-after"));
+        if (feedback.cooldownSeconds) {
+          const now = Date.now();
+          setRetryUntil(now + feedback.cooldownSeconds * 1000);
+          setTimerNow(now);
         }
-        throw new Error((payload.error || "We could not complete this analysis. Please try again.") + idSuffix);
+        setSuggestQuick(feedback.recommendQuick);
+        throw new Error(feedback.message);
       }
       if (!Array.isArray(payload.claims) || typeof payload.rewrite !== "string" || typeof payload.model !== "string") {
         throw new Error("The analysis service returned an incomplete report.");
@@ -238,8 +260,13 @@ export default function Analyzer() {
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to analyze this content right now.");
+      const timeout = caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError");
+      setSuggestQuick(previous => previous || timeout);
+      setError(timeout
+        ? "The browser stopped waiting after 75 seconds. The server might still be processing; avoid immediately submitting the same claim again."
+        : caught instanceof Error ? caught.message : "Unable to analyze this content right now.");
     } finally {
+      requestInFlight.current = false;
       setBusy(false);
     }
   }
@@ -337,9 +364,12 @@ export default function Analyzer() {
               </button>
             </div>
             <div className="input-divider" />
-            <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
+            <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : waitSeconds > 0 ? <>Retry in {waitSeconds}s</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Live {mode === "deep" ? "deep investigation" : "quick check"} in progress. <span className="busy-duration" aria-hidden="true">{elapsedSeconds}s elapsed.</span> Provider requests may take some time; this is a real timer, not simulated research stages.</div>}
-            {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span></div>}
+            {error && <div className="error-banner" role="alert"><strong>Analysis unavailable</strong><span>{error}</span>
+              {waitSeconds > 0 && <span className="retry-countdown" role="status">Next allowed attempt in approximately {waitSeconds} seconds. The public demo is rate limited to protect provider credits.</span>}
+              {suggestQuick && mode === "deep" && <button type="button" className="retry-quick-button" onClick={() => { setMode("quick"); setSuggestQuick(false); setError(""); }} disabled={busy}>Switch to Quick Check (does not submit automatically)</button>}
+            </div>}
           </div>
           <div className="examples">
             <div className="examples-heading"><span>TRY AN EXAMPLE</span><span>These only fill the input — no results are fabricated.</span></div>
