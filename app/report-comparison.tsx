@@ -62,7 +62,7 @@ export default function ReportComparison({ current, completedAt }: { current: Sa
   }
 
   const shown = comparison?.rows.filter(row => !differencesOnly || row.kind !== "same") || [];
-  return <section className="report-compare-workspace" aria-labelledby="report-compare-title">
+  return <section className="report-compare-workspace" id="report-comparison" aria-labelledby="report-compare-title">
     <div className="report-compare-header">
       <div>
         <span className="step-index">LOCAL INVESTIGATION HISTORY</span>

@@ -7,6 +7,7 @@ import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
 import ReportComparison from "./report-comparison";
 import EditorialReviewDesk from "./editorial-review-desk";
+import { InvestigationBrief, ReportSectionNavigation } from "./investigation-brief";
 import { editorialDecisionLabels, newEditorialReview, type EditorialDecision } from "./editorial-review";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
@@ -408,12 +409,15 @@ export default function Analyzer() {
           {!busy && !error && report.mode !== mode && !importedReport && <p className="previous-report-note">This saved result used {report.mode === "deep" ? "Deep Investigation" : "Quick Check"}. The selected mode applies only to your next request.</p>}
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
           {(report.investigation?.partialClaims || report.investigation?.rewriteStatus === "unavailable") && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}
+          <ReportSectionNavigation />
+          <InvestigationBrief claims={report.claims} mode={report.mode} completedAt={completedAt} reviewedUrls={reviewedUrls}
+            rewriteUnavailable={report.investigation?.rewriteStatus === "unavailable"} onCopy={copyText} />
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
           <EvidenceCoverageBoard claims={report.claims} />
           <ReportComparison key={completedAt || submittedContent} current={report} completedAt={completedAt}/>
-          <div className="report-list">
+          <div className="report-list" id="claim-assessments">
             {report.claims.map((claim, index) => <article className="claim-card" key={index} id={"claim-" + (index + 1)}>
               <div className="claim-card-head"><span className="claim-index">CLAIM {String(index + 1).padStart(2, "0")}</span><span className={"verdict verdict-" + claim.verdict}>{verdicts[claim.verdict].label}</span></div>
               <h3>{claim.claim}</h3><ResearchReasoning claim={claim} /><div className="assessment-label">ASSESSMENT</div><GroundedExplanation text={claim.explanation} sources={claim.sources} claimNumber={index + 1} />
@@ -424,7 +428,7 @@ export default function Analyzer() {
             </article>)}
           </div>
           <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} sourceNotes={sourceNotes} onNoteChange={changeSourceNote} />
-          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">{report.investigation?.rewriteStatus === "unavailable" ? "REWRITE UNAVAILABLE" : "SUGGESTED REVISION"}</span><h3>{report.investigation?.rewriteStatus === "unavailable" ? "Original text retained — edit cautiously." : "Say what the evidence supports."}</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div>{report.investigation?.rewriteStatus === "unavailable" && <p className="partial-rewrite-warning">Nemotron could not produce the cautious rewrite for this run. The text shown here is the unmodified original, not an AI correction.</p>}<RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          <div className="rewrite-panel" id="report-rewrite"><div className="rewrite-heading"><div><span className="step-index">{report.investigation?.rewriteStatus === "unavailable" ? "REWRITE UNAVAILABLE" : "SUGGESTED REVISION"}</span><h3>{report.investigation?.rewriteStatus === "unavailable" ? "Original text retained — edit cautiously." : "Say what the evidence supports."}</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div>{report.investigation?.rewriteStatus === "unavailable" && <p className="partial-rewrite-warning">Nemotron could not produce the cautious rewrite for this run. The text shown here is the unmodified original, not an AI correction.</p>}<RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
           <EditorialReviewDesk claims={report.claims} aiRewrite={report.rewrite} draft={editorialDraft} decisions={editorialDecisions}
             reviewedSourceCount={uniqueCitedSources(report.claims).filter(source => reviewedUrls.includes(source.url)).length}
             totalSourceCount={uniqueCitedSources(report.claims).length}
