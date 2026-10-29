@@ -10,6 +10,7 @@
 
 /* Evidence intelligence report: compatible with both MVP and V2 payloads */
 .investigation-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:#123c32;border-radius:15px;color:white;padding:22px 20px;gap:16px;margin-bottom:20px}
+.decision-desk{margin:19px 0 20px;padding:23px 24px;border:1px solid #d8e8db;border-radius:17px;background:linear-gradient(125deg,#fbfefb 0%,#f1f8f2 100%)}.decision-desk-heading{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.decision-desk h3{font:800 22px/1.35 Manrope,sans-serif;letter-spacing:-.04em;color:#1c4030;margin:10px 0 5px}.decision-desk-heading p{max-width:650px;color:#667c6d;font-size:12px;line-height:1.7;margin:0}.readiness-pill{flex:0 0 auto;border-radius:99px;padding:8px 11px;font-size:10px;font-weight:800;letter-spacing:.03em}.readiness-review{background:#fff0df;color:#93621f}.readiness-caution{background:#e4f4e7;color:#246c45}.decision-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:19px}.decision-item{display:flex;gap:10px;padding:13px;border:1px solid #e0ece2;border-radius:11px;background:#fff;min-width:0}.decision-item.is-action{border-color:#ebdbbd;background:#fffdf8}.decision-number{display:grid;place-items:center;flex:0 0 22px;height:22px;border-radius:7px;background:#eaf3ec;color:#2d7650;font-size:10px;font-weight:800}.is-action .decision-number{background:#fff0dc;color:#9b6721}.decision-item strong{display:block;font-size:11px;line-height:1.45;color:#294b38}.decision-item p{color:#718177;font-size:10px;line-height:1.65;margin:5px 0 0}.decision-links{display:flex;gap:11px;flex-wrap:wrap;border-top:1px solid #dde9df;margin-top:16px;padding-top:14px}.decision-links a{color:#246d47;text-decoration:none;font-size:11px;font-weight:800}.decision-links a:hover{text-decoration:underline}
 .investigation-overview>div{display:flex;flex-direction:column;gap:7px}.investigation-overview strong{font:800 24px Manrope,sans-serif}.investigation-overview span{font-size:11px;color:#bbd7c7}
 .investigation-overview p{grid-column:1/-1;margin:0;border-top:1px solid #416457;padding-top:10px;font-size:11px;color:#bcd3c5}
 .research-reasoning{margin:0 0 18px}.research-topline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.strength-pill,.relationship-tag,.source-category,.research-topic,.retrieval-warning{display:inline-flex;align-items:center;border-radius:99px;padding:7px 10px;font-size:10px;letter-spacing:.02em;font-weight:800}
@@ -28,7 +29,7 @@
 .revision-comparison{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:22px}.revision-comparison>div{background:#fff;border:1px solid #d7e8d8;border-radius:12px;padding:17px;min-width:0}
 .revision-comparison span{font-size:10px;font-weight:800;color:#67806d;letter-spacing:.12em}.revision-comparison p{overflow-wrap:anywhere;white-space:pre-wrap;color:#405a49;font-size:14px;line-height:1.8;margin:14px 0 0}
 .revision-original{background:#f9f9f7!important}.rewrite-panel .result-actions{flex-wrap:wrap}
-@media(max-width:650px){.investigation-overview{grid-template-columns:repeat(2,1fr)}.revision-comparison{grid-template-columns:1fr}.revision-comparison>div{padding:14px}}
+@media(max-width:760px){.decision-actions{grid-template-columns:1fr}.decision-desk-heading{flex-direction:column;gap:10px}.readiness-pill{align-self:flex-start}}@media(max-width:650px){.investigation-overview{grid-template-columns:repeat(2,1fr)}.revision-comparison{grid-template-columns:1fr}.revision-comparison>div{padding:14px}.decision-desk{padding:18px}}
 @media print{header,.hero,.workspace,.empty-guide,footer,.result-actions,.claim-copy,.notice,.source-notes summary,.investigation-details summary{display:none!important}main{max-width:none;padding:0}.results{padding:0;border:0}.claim-card,.rewrite-panel{break-inside:avoid;box-shadow:none}.research-reasoning details,.source-notes{display:block}.source-notes p,.investigation-details p{display:block}.evidence-entry{break-inside:avoid}.results-heading{margin-bottom:12px}body{background:white;color:black}}
 
 .inline-citation{font-weight:800;color:#246d4a;text-underline-offset:3px}.evidence-entry{scroll-margin-top:32px}.evidence-entry:target{outline:3px solid #8ac69f;outline-offset:3px}
@@ -59,7 +60,7 @@
 
 /* Human review workspace: a user-side checklist, never a fake fact-check score */
 .source-review-workspace{margin:22px 0;border:1px solid #d6e5d8;border-radius:19px;padding:26px;background:#fbfefb}
-.source-review-heading{display:flex;align-items:start;justify-content:space-between;gap:22px}
+.source-review-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:22px}
 .source-review-heading h3{font:800 23px/1.35 Manrope,sans-serif;letter-spacing:-.04em;margin:13px 0 9px}
 .source-review-heading p{font-size:13px;line-height:1.7;color:#64796a;margin:0;max-width:730px}
 .source-review-progress{flex-shrink:0;display:grid;gap:4px;text-align:center;border-radius:11px;background:#eaf4ec;padding:14px 18px}

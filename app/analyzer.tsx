@@ -102,6 +102,8 @@ export default function Analyzer() {
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
+  const citedSourceCount = report ? uniqueCitedSources(report.claims).length : 0;
+  const publicationRisks = counts.contradicted + counts.mixed + counts.insufficient_evidence;
 
   useEffect(() => {
     if (!busy) return;
@@ -337,6 +339,15 @@ export default function Analyzer() {
         <section className="results" id="results" aria-labelledby="results-title">
           <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span><h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={startAnotherAnalysis}>New analysis</button><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
+          <section className="decision-desk" aria-labelledby="decision-desk-title">
+            <div className="decision-desk-heading"><div><span className="step-index">READINESS DESK</span><h3 id="decision-desk-title">Before you rely on this report</h3><p>Use the retrieved links and the original pages to make the final editorial decision.</p></div><span className={"readiness-pill " + (publicationRisks ? "readiness-review" : "readiness-caution")}>{publicationRisks ? "Review needed" : "Source review needed"}</span></div>
+            <div className="decision-actions">
+              <div className={"decision-item " + (publicationRisks ? "is-action" : "is-clear")}><span className="decision-number">01</span><div><strong>{publicationRisks ? publicationRisks + " claim" + (publicationRisks === 1 ? " needs" : "s need") + " attention" : "No conflicting claim verdicts"}</strong><p>{publicationRisks ? "Revise, qualify, or investigate any contradicted, mixed, or insufficient-evidence claim before publishing." : "The model found no contradicted, mixed, or insufficient-evidence verdicts. Original sources still need human review."}</p></div></div>
+              <div className={"decision-item " + (reviewedUrls.length < citedSourceCount ? "is-action" : "is-clear")}><span className="decision-number">02</span><div><strong>{reviewedUrls.length} of {citedSourceCount} sources personally reviewed</strong><p>Manual review markers are your own checklist, not a verification seal or source-quality score.</p></div></div>
+              <div className="decision-item"><span className="decision-number">03</span><div><strong>Use the cautious rewrite as a draft</strong><p>It is generated from this report&apos;s assessments. Keep checking the complete linked pages before reuse.</p></div></div>
+            </div>
+            <div className="decision-links"><a href="#source-review-title">Review retrieved sources <span aria-hidden="true">↓</span></a><a href="#suggested-revision">Open cautious rewrite <span aria-hidden="true">↓</span></a></div>
+          </section>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
           <div className="report-list">
@@ -350,7 +361,7 @@ export default function Analyzer() {
             </article>)}
           </div>
           <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} />
-          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report), "Sourced draft")}>Copy with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          <div className="rewrite-panel" id="suggested-revision"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report), "Sourced draft")}>Copy with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
           {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
         </section>
