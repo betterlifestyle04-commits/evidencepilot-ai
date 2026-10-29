@@ -77,7 +77,7 @@ export default function EvidenceCoverageBoard({ claims }: { claims: ClaimInsight
 
   if (!rows.length) return null;
 
-  return <section className="coverage-board" aria-labelledby="coverage-title">
+  return <section className="coverage-board" id="evidence-coverage" aria-labelledby="coverage-title">
     <div className="coverage-topline">
       <div>
         <span className="step-index">EVIDENCE COVERAGE</span>

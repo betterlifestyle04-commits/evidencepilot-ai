@@ -32,7 +32,7 @@ export function SourceReviewDesk({
 }) {
   const sources = uniqueCitedSources(claims);
   if (!sources.length) {
-    return <section className="source-review-workspace" aria-labelledby="source-review-title">
+    return <section className="source-review-workspace" id="source-review" aria-labelledby="source-review-title">
       <span className="step-index">03 / HUMAN EVIDENCE REVIEW</span>
       <h3 id="source-review-title">No sources to inspect yet.</h3>
       <p>This report does not contain retrieved citation links. Treat every assessment as provisional.</p>
@@ -41,7 +41,7 @@ export function SourceReviewDesk({
   const reviewed = sources.filter(source => reviewedUrls.includes(source.url)).length;
   const percentage = Math.round(reviewed / sources.length * 100);
   const distinctPublishers = new Set(sources.map(item => sourceDomain(item.url))).size;
-  return <section className="source-review-workspace" aria-labelledby="source-review-title">
+  return <section className="source-review-workspace" id="source-review" aria-labelledby="source-review-title">
     <div className="source-review-heading">
       <div>
         <span className="step-index">03 / HUMAN EVIDENCE REVIEW</span>

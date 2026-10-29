@@ -33,7 +33,7 @@ export default function EditorialReviewDesk({
       setCopied(false);
     }
   }
-  return <section className="editorial-desk" aria-labelledby="editorial-desk-title">
+  return <section className="editorial-desk" id="editorial-review" aria-labelledby="editorial-desk-title">
     <div className="editorial-desk-heading">
       <div>
         <span className="step-index">HUMAN EDITORIAL DESK</span>
