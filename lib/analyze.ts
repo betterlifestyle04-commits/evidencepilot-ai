@@ -1,12 +1,12 @@
 import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor, type Assessment, type SearchResult } from "./evidence";
-import { ProviderError, type ResearchPlan } from "./providers";
+import { ProviderError, type ResearchPlan, type SearchResults } from "./providers";
 
 export type AnalysisMode = "quick" | "deep";
 export class AnalysisDeadlineError extends Error { constructor(){super("Analysis exceeded its time budget.");} }
 export type AnalysisProviders = {
   extractClaims(content: string): Promise<string[]>;
   planClaim(claim: string): Promise<ResearchPlan>;
-  searchClaim(query: string, mode?: AnalysisMode): Promise<SearchResult[]>;
+  searchClaim(query: string, mode?: AnalysisMode): Promise<SearchResults>;
   assess(claim: string, sources: SearchResult[], plan?: ResearchPlan): Promise<Assessment>;
   cautiousRewrite(original: string, assessments: { claim: string; verdict: string; explanation: string }[]): Promise<string>;
 };
@@ -39,14 +39,18 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
   const claims = await withinDeadline(() => providers.extractClaims(content));
   if (!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
 
-  let nebiusCalls = 1, tavilyCalls = 0, followupSearches = 0;
+  let nebiusCalls = 1, tavilyCalls = 0, followupSearches = 0, uniqueSearches = 0;
   const queryCache = new Map<string, Promise<SearchResult[]>>();
   const retrieve = (query: string) => {
     const key = query.trim().toLowerCase();
     const cached = queryCache.get(key);
     if (cached) return cached;
-    tavilyCalls++;
-    const task = providers.searchClaim(query, mode).catch(error => {
+    uniqueSearches++;
+    const task = providers.searchClaim(query, mode).then(results => {
+      tavilyCalls += results.providerAttempts || 1;
+      return results;
+    }).catch(error => {
+      tavilyCalls += error instanceof ProviderError ? error.attempts : 1;
       queryCache.delete(key);
       throw error;
     });
@@ -140,7 +144,7 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     providerCalls: { nebius: nebiusCalls, tavily: tavilyCalls, total: nebiusCalls + tavilyCalls },
     investigation: {
       durationMs: Date.now() - started,
-      uniqueSearches: tavilyCalls,
+      uniqueSearches,
       followupSearches,
       partialClaims: reviewed.filter(claim => claim.retrievalStatus).length,
       rewriteStatus,
