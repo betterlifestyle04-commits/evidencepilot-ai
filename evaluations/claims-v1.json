@@ -8,5 +8,7 @@
   {"id":"insufficient","claim":"The exact location of Atlantis has been conclusively established.","expectedVerdict":"insufficient_evidence","reference":"https://www.britannica.com/topic/Atlantis-legendary-island"},
   {"id":"politics-false","claim":"Norway is a member state of the European Union.","expectedVerdict":"contradicted","reference":"https://european-union.europa.eu/principles-countries-history/country-profiles/norway_en"},
   {"id":"statistics-context","claim":"The global population is exactly 8 billion people today.","expectedVerdict":"mixed","reference":"https://www.un.org/development/desa/pd/content/world-population-prospects-2024"},
-  {"id":"economics-time-sensitive","claim":"The United States inflation rate is 2 percent.","expectedVerdict":"insufficient_evidence","reference":"https://www.bls.gov/cpi/"}
+  {"id":"economics-time-sensitive","claim":"The United States inflation rate is 2 percent.","expectedVerdict":"insufficient_evidence","reference":"https://www.bls.gov/cpi/"},
+  {"id":"definition-ambiguous","claim":"The Sahara is the largest desert on Earth.","expectedVerdict":"mixed","reference":"https://www.britannica.com/place/Sahara-desert-Africa"},
+  {"id":"misleading-context","claim":"The Great Wall of China is visible from the Moon with the naked eye.","expectedVerdict":"contradicted","reference":"https://science.nasa.gov/earth/earth-observatory/astronaut-photography/"}
 ]

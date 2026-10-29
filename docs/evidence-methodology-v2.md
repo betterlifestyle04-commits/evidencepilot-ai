@@ -25,7 +25,7 @@ Nemotron returns `strong`, `moderate`, `limited`, or `insufficient` evidence str
 
 ## Evaluation
 
-`evaluations/claims-v1.json` contains ten curated claims across science, history, technology, health, politics, statistics, time-sensitive, ambiguous, and insufficient-evidence scenarios. Each expected outcome is accompanied by an independently checked reference URL. Run `npm run evaluate:live` only after securely configuring provider keys. It prints actual verdicts, citation counts, and elapsed durations; it does not claim accuracy automatically or persist provider data.
+`evaluations/claims-v1.json` contains twelve curated claims across science, history, technology, health, politics, statistics, time-sensitive, ambiguous, misleading-context, and insufficient-evidence scenarios. Each expected outcome is accompanied by an independently checked reference URL. A deterministic test enforces the minimum case count and schema. Run `npm run evaluate:live` only after securely configuring provider keys. It prints actual verdicts, citation counts, and elapsed durations; it does not claim accuracy automatically or persist provider data.
 
 ## Known limitations
 
