@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseClaims, parseJsonObject, rankSearchResults, sanitizeSearchResults, sourcesFor, validateAssessment } from "../lib/evidence";
+import { independenceNotes, parseClaims, parseJsonObject, rankSearchResults, sanitizeSearchResults, sourcesFor, validateAssessment } from "../lib/evidence";
 test("parses, de-duplicates, and caps claims at three",()=>{const claims=parseClaims(["A verifiable claim is here.","A verifiable claim is here.","Another claim with enough text.","Third claim with enough text.","Fourth claim with enough text."]);assert.equal(claims.length,3);});
 test("accepts a fenced compatible JSON fallback",()=>assert.equal(parseJsonObject("```json\n{\"ok\":true}\n``` ").ok,true));
 test("never permits supported without a cited retrieved URL",()=>{const sources=[{title:"Good",url:"https://example.com",content:"Excerpt"},{title:"Bad",url:"javascript:alert(1)",content:"No"}];const assessment=validateAssessment({claim:"A claim long enough",verdict:"supported",explanation:"The result supports it.",sourceIndices:[1]},sources);assert.equal(assessment.verdict,"insufficient_evidence");assert.equal(sourcesFor(assessment.sourceIndices,sources).length,0);});
@@ -62,4 +62,11 @@ test("keeps directly supported verdicts with aligned cited relationships",()=>{
   const sources=[{title:"Direct",url:"https://example.org/primary",content:"Direct evidence"}];
   const item=validateAssessment({claim:"A checkable statement",verdict:"supported",explanation:"The source supports it",sourceIndices:[0],sourceAssessments:[{index:0,relationship:"supports",relevance:"Direct",limitations:"Excerpt only"}]},sources);
   assert.equal(item.verdict,"supported");
+});
+test("flags similar cross-domain titles as a corroboration caution",()=>{
+  const sources=[{title:"Mars is the fourth planet from the Sun",url:"https://example.org/mars",content:"Text"},{title:"Mars is the fourth planet from the Sun",url:"https://example.net/mars",content:"Text"}];
+  const notes=independenceNotes(sources);
+  assert.equal(notes.size,2);
+  assert.match(notes.get(0)||"",/may not be independent/);
+  assert.match(sourcesFor([0],sources)[0].independenceNote||"",/may not be independent/);
 });
