@@ -8,8 +8,8 @@ import { clientRateLimitKey, requestId } from "@/lib/request-security";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 const MAX_BODY_BYTES = 16_000;
-const response = (body: unknown, status = 200, id = requestId()) =>
-  NextResponse.json({ ...body as object, requestId: id }, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Request-Id": id } });
+const response = (body: unknown, status = 200, id = requestId(), extraHeaders: Record<string,string> = {}) =>
+  NextResponse.json({ ...body as object, requestId: id }, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Request-Id": id, ...extraHeaders } });
 
 export async function POST(request: NextRequest) {
   const id = requestId();
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
     const client = clientRateLimitKey(request.headers.get("x-forwarded-for"));
     if (!await checkRateLimit(client)) {
-      return response({ error: "Rate limit reached. Try again in " + rateLimitInfo.windowSeconds + " seconds." }, 429, id);
+      return response({ error: "Rate limit reached. Try again in " + rateLimitInfo.windowSeconds + " seconds." }, 429, id, { "Retry-After": String(rateLimitInfo.windowSeconds) });
     }
     const report = await analyzeContent(content, providers, mode as AnalysisMode);
     return response({ ...report, model: process.env.NEBIUS_MODEL || "nvidia/nemotron-3-super-120b-a12b" }, 200, id);

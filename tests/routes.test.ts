@@ -28,3 +28,11 @@ test("analysis responses include a correlation ID without internal details", asy
   assert.match(body.requestId, /^[0-9a-f-]{36}$/);
   assert.equal(response.headers.get("x-request-id"), body.requestId);
 });
+test("rate-limit rejection includes a standard retry window", async () => {
+  const headers = { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.77" };
+  const body = JSON.stringify({ content: "This is a valid factual statement worth checking." });
+  for (let index = 0; index < 3; index++) await POST(new NextRequest("http://localhost/api/analyze", { method: "POST", headers, body }));
+  const response = await POST(new NextRequest("http://localhost/api/analyze", { method: "POST", headers, body }));
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "60");
+});
