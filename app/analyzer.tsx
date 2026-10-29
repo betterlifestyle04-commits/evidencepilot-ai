@@ -5,6 +5,8 @@ import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
 import ReportComparison from "./report-comparison";
+import EditorialReviewDesk from "./editorial-review-desk";
+import { editorialDecisionLabels, newEditorialReview, type EditorialDecision } from "./editorial-review";
 import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
@@ -25,7 +27,7 @@ const examples = [
   { title: "Explore a contextual claim", tag: "Geography", text: "The Sahara is the largest desert on Earth." }
 ];
 
-function reportMarkdown(report: Report, original: string, reviewedUrls: string[], completedAt: string | null, sourceNotes: Record<string, string>) {
+function reportMarkdown(report: Report, original: string, reviewedUrls: string[], completedAt: string | null, sourceNotes: Record<string, string>, editorialDraft: string, editorialDecisions: EditorialDecision[]) {
   const lines: string[] = [
     "# EvidencePilot evidence report",
     "",
@@ -62,13 +64,16 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
     const note = sourceNotes[source.url]?.trim();
     if (note) lines.push("  - Reader note: " + note.replace(/\s+/g, " ").slice(0, 600));
   }
+  lines.push("", "## Reader editorial decisions", "", "These are personal editing decisions, not independently verified verdicts.", "");
+  report.claims.forEach((item,index) => lines.push("- Claim " + (index + 1) + ": " + editorialDecisionLabels[editorialDecisions[index] || "unreviewed"]));
+  lines.push("", "## Reader working draft", "", editorialDraft, "", "Reader-edited text has not been re-analyzed or verified.", "");
   lines.push("", "Model: " + report.model);
   if (report.investigation) lines.push("Searches: " + report.investigation.uniqueSearches + " (follow-up: " + report.investigation.followupSearches + ")");
   return lines.join("\n");
 }
 
 
-function publishableDraft(report: Report) {
+function publishableDraft(report: Report, draft: string) {
   // All URLs are taken directly from the server-validated retrieved sources.
   const links = new Map<string, string>();
   for (const claim of report.claims) {
@@ -78,7 +83,7 @@ function publishableDraft(report: Report) {
   }
   const citations = [...links].map(([url,title],index) =>
     "[" + (index + 1) + "] " + title + " — " + url);
-  return [report.rewrite,
+  return [draft,
     "",
     "Retrieved sources to independently review:",
     citations.length ? citations.join("\n") : "No source links were provided.",
@@ -94,6 +99,8 @@ export default function Analyzer() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [reviewedUrls, setReviewedUrls] = useState<string[]>([]);
   const [sourceNotes, setSourceNotes] = useState<Record<string, string>>({});
+  const [editorialDraft, setEditorialDraft] = useState("");
+  const [editorialDecisions, setEditorialDecisions] = useState<EditorialDecision[]>([]);
   const [completedAt, setCompletedAt] = useState<string | null>(null);
   const [mode, setMode] = useState<AnalysisMode>("quick");
   const [submittedContent, setSubmittedContent] = useState("");
@@ -104,7 +111,7 @@ export default function Analyzer() {
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const canAnalyze = content.trim().length >= 20 && !busy;
-  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes) : "";
+  const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes, editorialDraft, editorialDecisions) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
@@ -118,6 +125,10 @@ export default function Analyzer() {
     const interval = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
     return () => clearInterval(interval);
   }, [busy]);
+
+  function setEditorialDecision(index: number, decision: EditorialDecision) {
+    setEditorialDecisions(previous => previous.map((old, position) => position === index ? decision : old));
+  }
 
   function changeSourceNote(url: string, note: string) {
     setSourceNotes(previous => ({ ...previous, [url]: note.slice(0, 600) }));
@@ -149,6 +160,8 @@ export default function Analyzer() {
       setReport(saved.report);
       setReviewedUrls(saved.reviewedUrls);
       setSourceNotes(saved.sourceNotes);
+      setEditorialDraft(saved.editorialReview.draft);
+      setEditorialDecisions(saved.editorialReview.decisions);
       setCompletedAt(saved.completedAt);
       setMode(saved.report.mode || "quick");
       setImportedReport(true);
@@ -217,6 +230,8 @@ export default function Analyzer() {
       setSubmittedContent(submitted);
       setReviewedUrls([]);
       setSourceNotes({});
+      setEditorialDraft(payload.rewrite);
+      setEditorialDecisions(newEditorialReview(payload.claims.length, payload.rewrite).decisions);
       setCompletedAt(new Date().toISOString());
       setReport(payload as Report);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
@@ -238,7 +253,7 @@ export default function Analyzer() {
 
   function downloadJson() {
     if (!report) return;
-    const exportData = { product: "EvidencePilot", schemaVersion: 1, exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, sourceNotes, note: "Reader-marked only; not independent verification." } };
+    const exportData = { product: "EvidencePilot", schemaVersion: 1, exportedAt: new Date().toISOString(), analysisCompletedAt: completedAt, original: submittedContent, report, manualSourceReview: { reviewedUrls, sourceNotes, note: "Reader-marked only; not independent verification." }, manualEditorialReview: { decisions: editorialDecisions, draft: editorialDraft, note: "Reader-controlled editorial decisions and text; not AI verification." } };
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -373,7 +388,11 @@ export default function Analyzer() {
             </article>)}
           </div>
           <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} sourceNotes={sourceNotes} onNoteChange={changeSourceNote} />
-          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report), "Sourced draft")}>Copy with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          <EditorialReviewDesk claims={report.claims} aiRewrite={report.rewrite} draft={editorialDraft} decisions={editorialDecisions}
+            reviewedSourceCount={uniqueCitedSources(report.claims).filter(source => reviewedUrls.includes(source.url)).length}
+            totalSourceCount={uniqueCitedSources(report.claims).length}
+            onChangeDraft={setEditorialDraft} onSetDecision={setEditorialDecision} />
           {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
         </section>

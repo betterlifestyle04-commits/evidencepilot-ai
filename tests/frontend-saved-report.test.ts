@@ -36,6 +36,8 @@ test("reopens a real EvidencePilot export without dropping useful review notes",
   assert.equal(saved.report.mode, "quick");
   assert.equal(saved.report.investigation?.uniqueSearches, 1);
   assert.equal(saved.completedAt, "2026-10-28T22:00:00.000Z");
+  assert.equal(saved.editorialReview.draft, "Jupiter is the largest planet in our Solar System.");
+  assert.deepEqual(saved.editorialReview.decisions, ["unreviewed"]);
 });
 test("rejects scripts, credential-bearing links and localhost URLs", () => {
   for (const unsafe of ["javascript:alert(1)", "http://example.com", "https://user:secret@example.org/path", "https://localhost/internal", "https://127.0.0.1/private"]) {

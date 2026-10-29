@@ -1,4 +1,5 @@
 import type { ClaimInsight, EvidenceDetail, InvestigationSummary } from "./report-insights";
+import { parseEditorialReview, type EditorialReview } from "./editorial-review";
 
 /**
  * Only accepts self-contained EvidencePilot exports. All imported data is
@@ -19,6 +20,7 @@ export type SavedSnapshot = {
   completedAt: string | null;
   reviewedUrls: string[];
   sourceNotes: Record<string, string>;
+  editorialReview: EditorialReview;
 };
 
 const verdicts = new Set(["supported", "contradicted", "mixed", "insufficient_evidence"]);
@@ -165,6 +167,7 @@ export function parseSavedReport(raw: string): SavedSnapshot {
     report: { claims, rewrite, model, mode, providerCalls, investigation },
     completedAt: validTimestamp(file.analysisCompletedAt),
     reviewedUrls,
-    sourceNotes
+    sourceNotes,
+    editorialReview: parseEditorialReview(file.manualEditorialReview, claims.length, rewrite)
   };
 }
