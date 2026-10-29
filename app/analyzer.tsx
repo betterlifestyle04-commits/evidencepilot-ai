@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisFailure } from "./analysis-feedback";
+import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-body";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
@@ -124,7 +125,9 @@ export default function Analyzer() {
 
   const wordCount = useMemo(() => content.trim() ? content.trim().split(/\s+/).length : 0, [content]);
   const waitSeconds = retryUntil ? Math.max(0, Math.ceil((retryUntil - timerNow) / 1000)) : 0;
-  const canAnalyze = content.trim().length >= 20 && !busy && waitSeconds === 0;
+  const payloadBytes = useMemo(() => analysisPayloadBytes(content, mode), [content, mode]);
+  const oversizedPayload = payloadBytes > MAX_ANALYSIS_BODY_BYTES;
+  const canAnalyze = content.trim().length >= 20 && content.length <= 12_000 && !oversizedPayload && !busy && waitSeconds === 0;
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes, editorialDraft, editorialDecisions) : "";
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
@@ -219,7 +222,9 @@ export default function Analyzer() {
         return;
       }
       setContent(text);
-      setNotice("Document imported locally. No text is transmitted until you select Analyze.");
+      setNotice(analysisPayloadBytes(text, mode) > MAX_ANALYSIS_BODY_BYTES
+        ? "Document imported locally but exceeds the 16 KB request limit. Shorten it before analyzing."
+        : "Document imported locally. No text is transmitted until you select Analyze.");
       document.getElementById("content")?.focus();
     } catch {
       setError("We could not read this file. Please paste the text manually.");
@@ -355,7 +360,8 @@ export default function Analyzer() {
               placeholder="Paste something worth checking...&#10;&#10;Example: The first iPhone was introduced in 2007. The original iPhone supported 5G connectivity."
               aria-describedby="text-guidance"
             />
-            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
+            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
+            {oversizedPayload && <p className="payload-limit-warning" role="alert">This text uses {payloadBytes.toLocaleString()} UTF-8 JSON request bytes, exceeding the 16 KB demo limit. Shorten it before analyzing. Accents, Arabic and emoji may take more than one byte per character.</p>}
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
             <div className="saved-report-import">
               <label className="import-file import-report">↗ Reopen saved report (.json)

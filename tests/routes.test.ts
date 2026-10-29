@@ -34,3 +34,26 @@ test("all validation failures carry an opaque correlation ID and no-cache header
   assert.match(response.headers.get("x-request-id") || "",/^[0-9a-f-]{36}$/);
   assert.equal(response.headers.get("cache-control"),"no-store");
 });
+
+test("analysis endpoint rejects actual oversized UTF-8 bytes without Content-Length",async()=>{
+  const payload=JSON.stringify({content:"مرحبا🌍".repeat(1600),mode:"quick"});
+  const response=await POST(new NextRequest("http://localhost/api/analyze",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:payload
+  }));
+  assert.equal(response.status,413);
+  assert.match((await response.json()).error,/16 KB/);
+});
+test("analysis endpoint does not trust a small declared Content-Length",async()=>{
+  const payload=JSON.stringify({content:"é".repeat(10000),mode:"quick"});
+  const response=await POST(new NextRequest("http://localhost/api/analyze",{
+    method:"POST",headers:{"Content-Type":"application/json","Content-Length":"2"},body:payload
+  }));
+  assert.equal(response.status,413);
+});
+test("malformed JSON gets a 400 and does not launch providers",async()=>{
+  const response=await POST(new NextRequest("http://localhost/api/analyze",{
+    method:"POST",headers:{"Content-Type":"application/json"},body:"{not json"
+  }));
+  assert.equal(response.status,400);
+  assert.match((await response.json()).error,/valid JSON/);
+});

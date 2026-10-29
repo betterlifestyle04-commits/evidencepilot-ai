@@ -4,10 +4,10 @@ import * as providers from "@/lib/providers";
 import { ProviderError } from "@/lib/providers";
 import { checkRateLimit, rateLimitInfo } from "@/lib/rate-limit";
 import { clientRateLimitKey, requestId } from "@/lib/request-security";
+import { MAX_ANALYSIS_BODY_BYTES, RequestBodyTooLargeError, readBoundedJson } from "@/lib/request-body";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const MAX_BODY_BYTES = 16_000;
 const response = (body: unknown, status = 200, id = requestId(), extraHeaders: Record<string,string> = {}) =>
   NextResponse.json({ ...body as object, requestId: id }, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "X-Request-Id": id, ...extraHeaders } });
 
@@ -18,10 +18,11 @@ export async function POST(request: NextRequest) {
       return response({ error: "Content-Type must be application/json." }, 415, id);
     }
     const length = Number(request.headers.get("content-length"));
-    if (Number.isFinite(length) && length > MAX_BODY_BYTES) {
+    if (Number.isFinite(length) && length > MAX_ANALYSIS_BODY_BYTES) {
       return response({ error: "Request payload is too large." }, 413, id);
     }
-    const body: unknown = await request.json();
+    // A Content-Length header can be absent or inaccurate; inspect actual stream bytes.
+    const body: unknown = await readBoundedJson(request);
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return response({ error: "Request body must contain content and an optional mode." }, 400, id);
     }
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
     const report = await analyzeContent(content, providers, mode as AnalysisMode);
     return response({ ...report, model: process.env.NEBIUS_MODEL || "nvidia/nemotron-3-super-120b-a12b" }, 200, id);
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) return response({ error: "Request payload exceeds 16 KB. Shorten the text before analyzing." }, 413, id);
     // A valid opinion-only submission is not a service outage or malformed JSON.
     if (error instanceof NoCheckableClaimsError) return response({
       code: "NO_CHECKABLE_CLAIMS",
