@@ -27,3 +27,10 @@ test("analysis responses include a correlation ID without internal details", asy
   assert.match(body.requestId, /^[0-9a-f-]{36}$/);
   assert.equal(response.headers.get("x-request-id"), body.requestId);
 });
+
+test("all validation failures carry an opaque correlation ID and no-cache headers",async()=>{
+  const response = await POST(new NextRequest("http://localhost/api/analyze",{method:"POST",body:"bad input"}));
+  assert.equal(response.status,415);
+  assert.match(response.headers.get("x-request-id") || "",/^[0-9a-f-]{36}$/);
+  assert.equal(response.headers.get("cache-control"),"no-store");
+});
