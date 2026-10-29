@@ -29,6 +29,8 @@ Open `http://localhost:3000`. Confirm the selected `NEBIUS_MODEL` exists in your
 npm test       # claim parsing and citation/evidence validation
 npm run lint   # TypeScript
 npm run build  # production build
+npm run smoke:demo # public deployment health probe; no AI calls or credits
+npm run smoke:demo -- --live # optional 2 real API investigations; consumes credits
 npm run verify:providers # live Nebius catalog/structured-JSON and Tavily probe; consumes provider credits
 npm run evaluate:live # optional live 10-case evaluation; consumes provider credits
 ```
@@ -52,3 +54,7 @@ The UI offers two actual server-side workflows:
 Both modes use the same citation validation, uncertainty and Upstash rate limiting. The API returns its actual mode. Without a mode, the API defaults to Quick Check. Neither mode fabricates results.
 
 Live Vercel latency for each mode needs verification before relying on it for demonstrations.
+
+## Demonstration runbook
+
+For the [operator checklist and three-minute recording outline](docs/demo-runbook.md), use the credit-free `npm run smoke:demo` deployment check first. Add `--live` only when you explicitly want two real Quick/Deep analyses. This is not an accuracy benchmark and does not automatically retry failed requests.

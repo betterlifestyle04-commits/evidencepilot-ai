@@ -8,6 +8,7 @@
     "start": "next start",
     "test": "tsx --test tests/**/*.test.ts",
     "verify:providers": "tsx scripts/verify-providers.ts",
+    "smoke:demo": "tsx scripts/demo-smoke.ts",
     "evaluate:live": "tsx scripts/evaluate-live.ts",
     "lint": "tsc --noEmit"
   },
