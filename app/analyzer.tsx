@@ -32,6 +32,7 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
     "# EvidencePilot evidence report",
     "",
     "This is AI-assisted research. Sources must be reviewed independently.",
+    ...(report.investigation?.rewriteStatus === "unavailable" ? ["Warning: AI rewriting was unavailable. The report retains the original submitted text, not a verified correction."] : []),
     ...(completedAt ? ["Analysis completed (UTC): " + completedAt] : []),
     "",
     "## Original submitted text",
@@ -58,7 +59,7 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
       lines.push("");
     }
   });
-  lines.push("## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
+  lines.push(report.investigation?.rewriteStatus === "unavailable" ? "## Original text retained (AI rewrite unavailable)" : "## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
   for (const source of uniqueCitedSources(report.claims)) {
     lines.push("- [" + (reviewedUrls.includes(source.url) ? "x" : " ") + "] [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")");
     const note = sourceNotes[source.url]?.trim();
@@ -217,12 +218,13 @@ export default function Analyzer() {
         body: JSON.stringify({ content: submitted, mode })
       });
       const data: unknown = await response.json();
-      const payload = data as Partial<Report> & { error?: string };
+      const payload = data as Partial<Report> & { error?: string; requestId?: string };
       if (!response.ok) {
+        const idSuffix = typeof payload.requestId === "string" && /^[0-9a-f-]{36}$/i.test(payload.requestId) ? " (Request ID: " + payload.requestId + ")" : "";
         if (response.status === 503 && payload.error === "Provider configuration is incomplete.") {
-          throw new Error("Live analysis has not been connected yet. Set the secure Nebius and Tavily API keys on the server to activate it.");
+          throw new Error("Live analysis has not been connected yet. Check the secure Nebius and Tavily API configuration." + idSuffix);
         }
-        throw new Error(payload.error || "We could not complete this analysis. Please try again.");
+        throw new Error((payload.error || "We could not complete this analysis. Please try again.") + idSuffix);
       }
       if (!Array.isArray(payload.claims) || typeof payload.rewrite !== "string" || typeof payload.model !== "string") {
         throw new Error("The analysis service returned an incomplete report.");
@@ -372,6 +374,7 @@ export default function Analyzer() {
         <section className="results" id="results" aria-labelledby="results-title">
           <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
+          {(report.investigation?.partialClaims || report.investigation?.rewriteStatus === "unavailable") && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
@@ -388,11 +391,11 @@ export default function Analyzer() {
             </article>)}
           </div>
           <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} sourceNotes={sourceNotes} onNoteChange={changeSourceNote} />
-          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">SUGGESTED REVISION</span><h3>Say what the evidence supports.</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div><RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          <div className="rewrite-panel"><div className="rewrite-heading"><div><span className="step-index">{report.investigation?.rewriteStatus === "unavailable" ? "REWRITE UNAVAILABLE" : "SUGGESTED REVISION"}</span><h3>{report.investigation?.rewriteStatus === "unavailable" ? "Original text retained — edit cautiously." : "Say what the evidence supports."}</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div>{report.investigation?.rewriteStatus === "unavailable" && <p className="partial-rewrite-warning">Nemotron could not produce the cautious rewrite for this run. The text shown here is the unmodified original, not an AI correction.</p>}<RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
           <EditorialReviewDesk claims={report.claims} aiRewrite={report.rewrite} draft={editorialDraft} decisions={editorialDecisions}
             reviewedSourceCount={uniqueCitedSources(report.claims).filter(source => reviewedUrls.includes(source.url)).length}
             totalSourceCount={uniqueCitedSources(report.claims).length}
-            onChangeDraft={setEditorialDraft} onSetDecision={setEditorialDecision} />
+            onChangeDraft={setEditorialDraft} onSetDecision={setEditorialDecision} rewriteUnavailable={report.investigation?.rewriteStatus === "unavailable"} />
           {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
         </section>

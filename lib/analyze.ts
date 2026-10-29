@@ -12,7 +12,7 @@ export type AnalysisProviders = {
 
 type ReviewedClaim = Assessment & {
   sources: ReturnType<typeof sourcesFor>;
-  retrievalStatus?: "unavailable" | "empty";
+  retrievalStatus?: "unavailable" | "empty" | "assessment_unavailable";
   researchPlan?: Omit<ResearchPlan,"queries">;
 };
 const fallbackPlan = (claim: string): ResearchPlan => ({
@@ -90,12 +90,21 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     };
 
     nebiusCalls++;
-    const assessment = await providers.assess(plan.normalizedClaim, results, plan);
-    return {
-      ...assessment,
-      sources: sourcesFor(assessment.sourceIndices, results, assessment.sourceAssessments),
-      researchPlan: planSummary(plan)
-    };
+    try {
+      const assessment = await providers.assess(plan.normalizedClaim, results, plan);
+      return {
+        ...assessment,
+        sources: sourcesFor(assessment.sourceIndices, results, assessment.sourceAssessments),
+        researchPlan: planSummary(plan)
+      };
+    } catch (error) {
+      if (error instanceof ProviderError && error.kind === "configuration") throw error;
+      return {
+        claim: plan.normalizedClaim, verdict: "insufficient_evidence",
+        explanation: "Evidence was retrieved, but the assessment service was temporarily unavailable, so no conclusion can be supported.",
+        sourceIndices: [], sources: [], retrievalStatus: "assessment_unavailable", researchPlan: planSummary(plan)
+      };
+    }
   }
 
   // At most two claim investigations run concurrently, preserving the displayed order.
@@ -106,7 +115,14 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     reviewed.push(...batch);
   }
   nebiusCalls++;
-  const rewrite = await providers.cautiousRewrite(content, reviewed);
+  let rewrite = content;
+  let rewriteStatus: "unavailable" | undefined;
+  try {
+    rewrite = await providers.cautiousRewrite(content, reviewed);
+  } catch (error) {
+    if (error instanceof ProviderError && error.kind === "configuration") throw error;
+    rewriteStatus = "unavailable";
+  }
   return {
     claims: reviewed,
     rewrite,
@@ -116,7 +132,8 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
       durationMs: Date.now() - started,
       uniqueSearches: tavilyCalls,
       followupSearches,
-      partialClaims: reviewed.filter(claim => claim.retrievalStatus).length
+      partialClaims: reviewed.filter(claim => claim.retrievalStatus).length,
+      rewriteStatus
     }
   };
 }

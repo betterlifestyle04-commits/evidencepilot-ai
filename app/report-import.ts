@@ -109,6 +109,10 @@ function parseClaim(value: unknown): ClaimInsight {
     retrievalStatus
   };
 }
+function pRewriteStatus(value: unknown): "unavailable" | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  return (value as Record<string, unknown>).rewriteStatus === "unavailable" ? "unavailable" : undefined;
+}
 function validTimestamp(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return null;
   return Number.isFinite(Date.parse(value)) ? value : null;
@@ -145,6 +149,7 @@ export function parseSavedReport(raw: string): SavedSnapshot {
       investigation = { durationMs: durationMs!, uniqueSearches: uniqueSearches!, followupSearches: followupSearches!, partialClaims: partialClaims! };
     }
   }
+  if (investigation) investigation.rewriteStatus = pRewriteStatus(reportValue.investigation);
   const urls = new Set(claims.flatMap(claim => claim.sources.map(source => source.url)));
   const review = file.manualSourceReview;
   const reviewedUrls: string[] = [];

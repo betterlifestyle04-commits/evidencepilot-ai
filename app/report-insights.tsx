@@ -15,11 +15,12 @@ export type ClaimInsight = {
   evidenceStrength?: "strong" | "moderate" | "limited" | "insufficient";
   qualifications?: string;
   researchPlan?: ResearchPlanSummary;
-  retrievalStatus?: "empty" | "unavailable";
+  retrievalStatus?: "empty" | "unavailable" | "assessment_unavailable";
 };
 export type InvestigationSummary = {
   durationMs: number; uniqueSearches: number;
   followupSearches: number; partialClaims: number;
+  rewriteStatus?: "unavailable";
 };
 const relationships: Record<NonNullable<EvidenceDetail["relationship"]>, string> = {
   supports: "Supports", contradicts: "Challenges", context: "Context", inconclusive: "Inconclusive"
@@ -50,7 +51,7 @@ export function ResearchReasoning({ claim }: { claim: ClaimInsight }) {
     <div className="research-topline">
       {claim.evidenceStrength && <span className={"strength-pill strength-" + claim.evidenceStrength}>{claim.evidenceStrength} evidence</span>}
       {plan && <span className="research-topic">{plan.claimType} {plan.timeSensitive ? "· time-sensitive" : ""}</span>}
-      {claim.retrievalStatus && <span className="retrieval-warning">{claim.retrievalStatus === "unavailable" ? "Source search unavailable" : "No usable sources retrieved"}</span>}
+      {claim.retrievalStatus && <span className="retrieval-warning">{claim.retrievalStatus === "unavailable" ? "Source search unavailable" : claim.retrievalStatus === "assessment_unavailable" ? "AI assessment unavailable" : "No usable sources retrieved"}</span>}
     </div>
     {claim.qualifications && <p className="research-qualification"><strong>Important qualification:</strong> {claim.qualifications}</p>}
     {plan && <details className="investigation-details"><summary>How this claim was investigated</summary>
