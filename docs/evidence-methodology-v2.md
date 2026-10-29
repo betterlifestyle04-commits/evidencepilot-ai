@@ -47,3 +47,8 @@ When deterministic evidence safeguards reduce a model's decisive assessment to `
 ## Browser import citation link policy
 
 Live search citations and reopened saved JSON reports now share a browser-compatible URL validator. It requires HTTPS with a public-looking DNS name and rejects local-only domain suffixes, single-label intranet hosts, credential-bearing links, and numeric IPv4/IPv6 address literals, including encoded IP host forms normalized by the URL parser. This is a static link filter, not DNS-based verification or an authenticity guarantee: a public-looking DNS name can still resolve to a private address. EvidencePilot does not auto-fetch imported links; readers choose whether to open them.
+
+
+## Strict live source-relationship validation (October 29, 2026)
+
+Live Nemotron verdicts now require one non-duplicated relationship entry for **every cited retrieved source** before a decisive `supported`, `contradicted`, or `mixed` verdict may be presented. Missing or contradictory relationships cause the deterministic evidence safeguard to report `insufficient_evidence` and explain the downgrade. Source links remain available for reader inspection. A clean one-sided verdict is also downgraded if the supplied cited sources include an explicit opposing relationship. This validates **consistency of the model's citation metadata**, not the factual truth of the underlying web pages. Legacy parsing retains its non-strict default for compatibility.

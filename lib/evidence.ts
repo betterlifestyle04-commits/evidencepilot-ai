@@ -73,7 +73,7 @@ export function parseClaims(value: unknown, limit = 3): string[] {
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) throw new Error("Nemotron returned an invalid claim list.");
   return [...new Set(value.map((item) => item.trim()).filter((item) => item.length >= 8 && item.length <= 400))].slice(0, limit);
 }
-export function validateAssessment(value: unknown, sources: SearchResult[]): Assessment {
+export function validateAssessment(value: unknown, sources: SearchResult[], options: { requireSourceRelationships?: boolean } = {}): Assessment {
   if (!value || typeof value !== "object") throw new Error("Nemotron returned an invalid assessment.");
   const input = value as Partial<Assessment>;
   const validVerdicts: Verdict[] = ["supported", "contradicted", "mixed", "insufficient_evidence"];
@@ -84,11 +84,20 @@ export function validateAssessment(value: unknown, sources: SearchResult[]): Ass
   const sourceAssessments = Array.isArray(input.sourceAssessments) ? input.sourceAssessments.filter((item): item is SourceAssessment => Boolean(item && typeof item === "object" && Number.isInteger((item as SourceAssessment).index) && sourceIndices.includes((item as SourceAssessment).index) && ["supports","contradicts","context","inconclusive"].includes((item as SourceAssessment).relationship) && typeof (item as SourceAssessment).relevance === "string" && typeof (item as SourceAssessment).limitations === "string")).slice(0, 4).map(item=>({...item,relevance:item.relevance.slice(0,300),limitations:item.limitations.slice(0,300)})) : [];
   const relationships = new Set(sourceAssessments.map(source => source.relationship));
   let verdict: Verdict = sourceIndices.length === 0 ? "insufficient_evidence" : input.verdict as Verdict;
-  // When the model provides per-source relationships, they must substantiate its
-  // decisive verdict. Older callers without this optional metadata remain supported.
+  // Live Nemotron assessments are expected to classify EVERY cited link.
+  // Missing, duplicate or contradictory relationships must not substantiate
+  // a confident verdict. The optional policy keeps legacy parsing compatible.
+  const relationshipIndices = sourceAssessments.map(item => item.index);
+  const hasDuplicateRelationships = new Set(relationshipIndices).size !== relationshipIndices.length;
+  const missingRelationships = sourceIndices.some(index => !relationshipIndices.includes(index));
+  if (options.requireSourceRelationships && verdict !== "insufficient_evidence" &&
+      (!sourceAssessments.length || hasDuplicateRelationships || missingRelationships)) {
+    verdict = "insufficient_evidence";
+  }
   if (sourceAssessments.length) {
-    if (verdict === "supported" && !relationships.has("supports")) verdict = "insufficient_evidence";
-    if (verdict === "contradicted" && !relationships.has("contradicts")) verdict = "insufficient_evidence";
+    // A source catalog with evidence on both sides is not a clean one-sided verdict.
+    if (verdict === "supported" && (!relationships.has("supports") || relationships.has("contradicts"))) verdict = "insufficient_evidence";
+    if (verdict === "contradicted" && (!relationships.has("contradicts") || relationships.has("supports"))) verdict = "insufficient_evidence";
     if (verdict === "mixed" && !(relationships.has("supports") && relationships.has("contradicts"))) verdict = "insufficient_evidence";
   }
   const verdictDowngraded = input.verdict !== "insufficient_evidence" && verdict === "insufficient_evidence";
