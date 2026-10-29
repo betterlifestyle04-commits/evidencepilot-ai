@@ -42,7 +42,7 @@ An analysis may be partial: `retrievalStatus` is `unavailable`, `empty`, or `ass
 
 Errors contain a public `error` string and `requestId`, never provider bodies or credentials. Common status codes are 400 (invalid JSON/input), 413 (body too large), 415 (non-JSON), 429 (demo limit; includes `Retry-After`), 502 (provider unavailable), 503 (missing/failed production protection), and 504 (provider or analysis deadline).
 
-`providerCalls.tavily` counts actual Tavily attempts, including its one permitted transient retry. The Nemotron count represents logical analysis operations; a JSON compatibility fallback may issue an additional model request.
+`providerCalls` counts completed provider attempts, including Tavily's one permitted transient retry and any Nebius JSON-compatibility fallback. A request stopped by the analysis deadline may have an in-flight upstream request whose final outcome cannot be observed after the response is returned.
 
 ## `GET /api/health`
 

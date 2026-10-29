@@ -1,5 +1,5 @@
 import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor, type Assessment, type SearchResult } from "./evidence";
-import { ProviderError, type ResearchPlan, type SearchResults } from "./providers";
+import { ProviderError, providerAttempts, type ResearchPlan, type RewriteResult, type SearchResults } from "./providers";
 
 export type AnalysisMode = "quick" | "deep";
 export class AnalysisDeadlineError extends Error { constructor(){super("Analysis exceeded its time budget.");} }
@@ -8,7 +8,7 @@ export type AnalysisProviders = {
   planClaim(claim: string): Promise<ResearchPlan>;
   searchClaim(query: string, mode?: AnalysisMode): Promise<SearchResults>;
   assess(claim: string, sources: SearchResult[], plan?: ResearchPlan): Promise<Assessment>;
-  cautiousRewrite(original: string, assessments: { claim: string; verdict: string; explanation: string }[]): Promise<string>;
+  cautiousRewrite(original: string, assessments: { claim: string; verdict: string; explanation: string }[]): Promise<string | RewriteResult>;
 };
 
 type ReviewedClaim = Assessment & {
@@ -36,10 +36,17 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     try { return await Promise.race([task(), new Promise<T>((_, reject) => { timer = setTimeout(() => { deadlineReached = true; reject(new AnalysisDeadlineError()); }, remaining); })]); }
     finally { if (timer) clearTimeout(timer); }
   };
-  const claims = await withinDeadline(() => providers.extractClaims(content));
+  let nebiusCalls = 0, tavilyCalls = 0, followupSearches = 0, uniqueSearches = 0;
+  let claims: string[];
+  try {
+    claims = await withinDeadline(() => providers.extractClaims(content));
+    nebiusCalls += providerAttempts(claims);
+  } catch (error) {
+    nebiusCalls += error instanceof ProviderError ? error.attempts : 1;
+    throw error;
+  }
   if (!claims.length) throw new Error("No independently verifiable factual claims were found in this text.");
 
-  let nebiusCalls = 1, tavilyCalls = 0, followupSearches = 0, uniqueSearches = 0;
   const queryCache = new Map<string, Promise<SearchResult[]>>();
   const retrieve = (query: string) => {
     const key = query.trim().toLowerCase();
@@ -68,9 +75,10 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
       plan = { ...fallbackPlan(claim), queries: [claim + " primary source fact check"] };
     } else {
       try {
-        nebiusCalls++;
         plan = await withinDeadline(() => providers.planClaim(claim));
+        nebiusCalls += providerAttempts(plan);
       } catch (error) {
+        nebiusCalls += error instanceof ProviderError ? error.attempts : 1;
         if (error instanceof ProviderError && error.kind === "configuration") throw error;
         plan = fallbackPlan(claim);
       }
@@ -103,15 +111,16 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
       sourceIndices: [], sources: [], retrievalStatus: "empty", researchPlan: planSummary(plan)
     };
 
-    nebiusCalls++;
     try {
       const assessment = await withinDeadline(() => providers.assess(plan.normalizedClaim, results, plan));
+      nebiusCalls += providerAttempts(assessment);
       return {
         ...assessment,
         sources: sourcesFor(assessment.sourceIndices, results, assessment.sourceAssessments),
         researchPlan: planSummary(plan)
       };
     } catch (error) {
+      nebiusCalls += error instanceof ProviderError ? error.attempts : 1;
       if (error instanceof ProviderError && error.kind === "configuration") throw error;
       return {
         claim: plan.normalizedClaim, verdict: "insufficient_evidence",
@@ -128,12 +137,14 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     const batch = await Promise.all(claims.slice(index, index + 2).map(investigate));
     reviewed.push(...batch);
   }
-  nebiusCalls++;
   let rewrite = content;
   let rewriteStatus: "unavailable" | undefined;
   try {
-    rewrite = await withinDeadline(() => providers.cautiousRewrite(content, reviewed));
+    const rewritten = await withinDeadline(() => providers.cautiousRewrite(content, reviewed));
+    nebiusCalls += providerAttempts(rewritten);
+    rewrite = typeof rewritten === "string" ? rewritten : rewritten.rewrite;
   } catch (error) {
+    nebiusCalls += error instanceof ProviderError ? error.attempts : 1;
     if (error instanceof ProviderError && error.kind === "configuration") throw error;
     rewriteStatus = "unavailable";
   }
