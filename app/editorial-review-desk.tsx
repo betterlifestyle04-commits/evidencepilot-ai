@@ -86,8 +86,8 @@ export default function EditorialReviewDesk({
         <span className={outstanding ? "editorial-pending" : "editorial-reviewed"}>
           {outstanding ? outstanding + " claim decisions still require attention" : "All claims received an editorial decision"}
         </span>
-        <span className={incompleteSources ? "editorial-pending" : "editorial-reviewed"}>
-          {incompleteSources ? incompleteSources + " cited sources not marked reviewed" : "All cited sources marked reviewed"}
+        <span className={totalSourceCount === 0 || incompleteSources ? "editorial-pending" : "editorial-reviewed"}>
+          {totalSourceCount === 0 ? "No cited sources available — verify independently" : incompleteSources ? incompleteSources + " cited sources not marked reviewed" : "All cited sources marked reviewed"}
         </span>
       </div>
       <p>This checklist measures only your manual workflow. Even if every item is complete, it does not establish that the claims, sources, or draft are accurate.</p>
