@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {analysisPayloadBytes,readBoundedJson,RequestBodyTooLargeError,MAX_ANALYSIS_BODY_BYTES} from "../lib/request-body";
 
 test("JSON wire size includes UTF-8 encoding, not just character length",()=>{
-  const ascii="A".repeat(4000), multilingual="مرحبا🌍".repeat(1000);
+  const ascii="A".repeat(4000), multilingual="مرحبا🌍".repeat(1200);
   assert.ok(analysisPayloadBytes(multilingual,"deep")>analysisPayloadBytes(ascii,"deep"));
   assert.ok(multilingual.length<=12000);
   assert.ok(analysisPayloadBytes(multilingual,"deep")>MAX_ANALYSIS_BODY_BYTES);
