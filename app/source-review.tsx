@@ -35,7 +35,7 @@ export function SourceReviewDesk({
     return <section className="source-review-workspace" id="source-review" aria-labelledby="source-review-title">
       <span className="step-index">03 / HUMAN EVIDENCE REVIEW</span>
       <h3 id="source-review-title">No sources to inspect yet.</h3>
-      <p>This report does not contain retrieved citation links. Treat every assessment as provisional.</p>
+      <p>This report contains no AI-cited sources. Some claims may still show retrieved but unassessed research leads in their individual sections; those links are not verified citations.</p>
     </section>;
   }
   const reviewed = sources.filter(source => reviewedUrls.includes(source.url)).length;

@@ -291,3 +291,16 @@
 /* Expected no-facts outcome is an editorial prompt, not a red service outage */
 .no-claims-feedback{background:#f1f7fc;border-color:#bbd8ec;color:#2e5976}
 .no-claims-feedback .retry-quick-button{border-color:#a2c9e4;color:#225b83;background:#fff}
+
+/* Retained research leads from an unavailable assessment are never cited evidence */
+.unassessed-research-leads{margin:16px 0;border:1px solid #d8dcef;background:#f8f9ff;border-radius:12px;padding:17px}
+.unassessed-leads-heading{display:flex;justify-content:space-between;gap:13px;align-items:center;flex-wrap:wrap;color:#3d5187}
+.unassessed-leads-heading strong{font-size:12px}.unassessed-leads-heading span{font-size:10px;color:#6071a0}
+.unassessed-research-leads>p{font-size:12px;line-height:1.75;color:#56668a;margin:10px 0}
+.unassessed-research-leads ul{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+.unassessed-research-leads li{border:1px solid #e0e4f4;background:white;padding:12px;border-radius:9px}
+.unassessed-research-leads li>a{color:#305b93;font-size:12px;font-weight:800;line-height:1.55;text-decoration:none;overflow-wrap:anywhere}
+.unassessed-research-leads li>a:hover{text-decoration:underline}
+.unassessed-research-leads li>small{display:block;margin:5px 0;color:#7686aa;font-size:10px}
+.unassessed-research-leads li>p{margin:5px 0 0;color:#627496;font-size:11px;line-height:1.6}
+@media print{.unassessed-research-leads li{break-inside:avoid}}

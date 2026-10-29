@@ -12,6 +12,8 @@ export type ResearchPlanSummary = {
 };
 export type ClaimInsight = {
   claim: string; verdict: Verdict; explanation: string; sources: EvidenceDetail[];
+  /** Real retrieved results that the failed assessment did not cite or verify. */
+  unassessedSources?: EvidenceDetail[];
   evidenceStrength?: "strong" | "moderate" | "limited" | "insufficient";
   qualifications?: string;
   researchPlan?: ResearchPlanSummary;
@@ -107,4 +109,24 @@ export function RevisionComparison({ original, rewrite }: { original: string; re
     <div className="revision-original"><span>ORIGINAL TEXT</span><p>{compact}</p></div>
     <div className="revision-new"><span>CAUTIOUS REWRITE</span><p>{rewrite}</p></div>
   </div>;
+}
+
+
+/** Retrieved links are explicitly NOT citations when the AI assessment failed. */
+export function UnassessedResearchLeads({ sources }: { sources?: EvidenceDetail[] }) {
+  if (!sources?.length) return null;
+  return <section className="unassessed-research-leads" aria-label="Retrieved but unassessed source leads">
+    <div className="unassessed-leads-heading">
+      <strong>Retrieved research leads — not AI-verified</strong>
+      <span>{sources.length} {sources.length === 1 ? "link" : "links"} preserved</span>
+    </div>
+    <p>Tavily retrieved these pages, but Nemotron could not complete its assessment. No verdict or source relationship is inferred from them. Open the originals and evaluate them yourself.</p>
+    <ul>
+      {sources.map((source,index) => <li key={source.url + "-" + index}>
+        <a href={source.url} target="_blank" rel="noopener noreferrer">{source.title} <span aria-hidden="true">↗</span></a>
+        <small>{source.publisher || domain(source.url)}</small>
+        {source.snippet && <p>{source.snippet}</p>}
+      </li>)}
+    </ul>
+  </section>;
 }
