@@ -152,3 +152,59 @@ test("source policy rejects local aliases and numeric hosts while accepting publ
     "https://example.org/article?id=12", "https://sub.example.co.uk/reference"
   ]) assert.equal(isSafeSourceUrl(safe), true, safe);
 });
+
+test("strict live policy downgrades decisive model verdicts without a relationship for every cited source",()=>{
+  const sources=[
+    {url:"https://example.org/report-a",title:"Report A",content:"First result"},
+    {url:"https://example.org/report-b",title:"Report B",content:"Second result"}
+  ];
+  const missingAll=validateAssessment({
+    claim:"A factual statement",verdict:"supported",
+    explanation:"Proven.",evidenceStrength:"strong",sourceIndices:[0,1]
+  },sources,{requireSourceRelationships:true});
+  assert.equal(missingAll.verdict,"insufficient_evidence");
+  assert.equal(missingAll.evidenceStrength,"insufficient");
+  assert.match(missingAll.explanation,/Evidence safeguard/);
+  const missingOne=validateAssessment({
+    claim:"A factual statement",verdict:"supported",
+    explanation:"Proven.",sourceIndices:[0,1],
+    sourceAssessments:[{index:0,relationship:"supports",relevance:"Direct",limitations:"Limited"}]
+  },sources,{requireSourceRelationships:true});
+  assert.equal(missingOne.verdict,"insufficient_evidence");
+  assert.deepEqual(missingOne.sourceIndices,[0,1],"genuine links stay accessible for manual review");
+  const complete=validateAssessment({
+    claim:"A factual statement",verdict:"supported",
+    explanation:"Direct evidence supports the claim.",sourceIndices:[0,1],
+    sourceAssessments:[
+      {index:0,relationship:"supports",relevance:"Direct",limitations:"Limited"},
+      {index:1,relationship:"context",relevance:"Context",limitations:"Not direct"}
+    ]
+  },sources,{requireSourceRelationships:true});
+  assert.equal(complete.verdict,"supported");
+});
+test("strict policy prevents duplicate or conflicting source relationships from supporting decisive conclusions",()=>{
+  const sources=[
+    {url:"https://example.org/a",title:"A",content:"Evidence"},
+    {url:"https://example.org/b",title:"B",content:"Evidence"}
+  ];
+  const shared={
+    claim:"A checkable claim",explanation:"Very confident.",sourceIndices:[0,1],
+    sourceAssessments:[
+      {index:0,relationship:"supports",relevance:"Direct",limitations:"A"},
+      {index:0,relationship:"contradicts",relevance:"Opposing",limitations:"B"},
+      {index:1,relationship:"context",relevance:"Context",limitations:"C"}
+    ]
+  };
+  const item=validateAssessment({...shared,verdict:"mixed"},sources,{requireSourceRelationships:true});
+  assert.equal(item.verdict,"insufficient_evidence");
+  const contradictory=validateAssessment({...shared,sourceAssessments:[
+    {index:0,relationship:"supports",relevance:"A",limitations:"A"},
+    {index:1,relationship:"contradicts",relevance:"B",limitations:"B"}
+  ],verdict:"supported"},sources,{requireSourceRelationships:true});
+  assert.equal(contradictory.verdict,"insufficient_evidence");
+});
+test("legacy evidence parser remains compatible with earlier saved model payloads",()=>{
+  const src=[{title:"Old result",url:"https://example.org/old",content:"Evidence"}];
+  const legacy=validateAssessment({claim:"Older claim",verdict:"supported",explanation:"Prior response",sourceIndices:[0]},src);
+  assert.equal(legacy.verdict,"supported");
+});
