@@ -7,7 +7,7 @@ import {
 } from "./editorial-review";
 
 export default function EditorialReviewDesk({
-  claims, aiRewrite, draft, decisions, reviewedSourceCount, totalSourceCount,
+  claims, aiRewrite, draft, decisions, reviewedSourceCount, totalSourceCount, rewriteUnavailable = false,
   onChangeDraft, onSetDecision
 }: {
   claims: ClaimInsight[];
@@ -16,6 +16,7 @@ export default function EditorialReviewDesk({
   decisions: EditorialDecision[];
   reviewedSourceCount: number;
   totalSourceCount: number;
+  rewriteUnavailable?: boolean;
   onChangeDraft: (draft: string) => void;
   onSetDecision: (index: number, decision: EditorialDecision) => void;
 }) {
@@ -64,10 +65,10 @@ export default function EditorialReviewDesk({
     </div>
     <div className="editorial-draft-heading">
       <div><span className="step-index">YOUR WORKING DRAFT</span>
-        <h4>Review the suggested correction.</h4>
-        <p>The editor starts with Nemotron's cautious rewrite. Changes you make are local and are never sent to Nebius or Tavily.</p>
+        <h4>{rewriteUnavailable ? "Prepare your own correction." : "Review the suggested correction."}</h4>
+        <p>{rewriteUnavailable ? "The AI rewrite was unavailable. This editor starts with the original submitted text, which has not been corrected." : "The editor starts with Nemotron's cautious rewrite."} Changes you make are local and are never sent to Nebius or Tavily.</p>
       </div>
-      <button className="secondary-button" type="button" disabled={!isEdited} onClick={() => onChangeDraft(aiRewrite)}>Reset to AI suggestion</button>
+      <button className="secondary-button" type="button" disabled={!isEdited} onClick={() => onChangeDraft(aiRewrite)}>{rewriteUnavailable ? "Reset to original text" : "Reset to AI suggestion"}</button>
     </div>
     <label className="editorial-draft-label" htmlFor="editorial-draft">Editable publication draft</label>
     <textarea id="editorial-draft" value={draft} maxLength={12_000} rows={7}
@@ -75,7 +76,7 @@ export default function EditorialReviewDesk({
       placeholder="Use the evidence report to prepare an accurately qualified statement."
       aria-describedby="editorial-draft-hint"/>
     <div className="editorial-draft-actions">
-      <span id="editorial-draft-hint">{draft.length.toLocaleString()} / 12,000 characters · {isEdited ? "Reader-edited draft" : "Unedited AI suggestion"}</span>
+      <span id="editorial-draft-hint">{draft.length.toLocaleString()} / 12,000 characters · {isEdited ? "Reader-edited draft" : rewriteUnavailable ? "Original text retained — no AI correction" : "Unedited AI suggestion"}</span>
       <button type="button" className="secondary-button" onClick={() => void copyWorkingDraft()} disabled={!draft.trim()}>
         {copied ? "Copied draft ✓" : "Copy working draft"}
       </button>

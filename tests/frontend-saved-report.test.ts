@@ -35,6 +35,7 @@ test("reopens a real EvidencePilot export without dropping useful review notes",
   assert.deepEqual(Object.values(saved.sourceNotes), ["Checked the primary NASA page."]);
   assert.equal(saved.report.mode, "quick");
   assert.equal(saved.report.investigation?.uniqueSearches, 1);
+  assert.equal(saved.report.investigation?.rewriteStatus, undefined);
   assert.equal(saved.completedAt, "2026-10-28T22:00:00.000Z");
   assert.equal(saved.editorialReview.draft, "Jupiter is the largest planet in our Solar System.");
   assert.deepEqual(saved.editorialReview.decisions, ["unreviewed"]);
@@ -56,4 +57,11 @@ test("caps saved report size and source excerpts", () => {
   const fixture = exportFixture();
   fixture.report.claims[0].sources[0].snippet = "x".repeat(2501);
   assert.throws(() => parseSavedReport(JSON.stringify(fixture)), /Invalid source excerpt/);
+});
+
+test("restores a partial rewrite status from a saved report", () => {
+  const fixture = exportFixture();
+  (fixture.report.investigation as typeof fixture.report.investigation & {rewriteStatus?:string}).rewriteStatus = "unavailable";
+  const saved = parseSavedReport(JSON.stringify(fixture));
+  assert.equal(saved.report.investigation?.rewriteStatus, "unavailable");
 });

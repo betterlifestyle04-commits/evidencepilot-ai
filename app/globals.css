@@ -228,3 +228,8 @@
 @media(max-width:700px){.editorial-decision{grid-template-columns:1fr;gap:13px}.editorial-draft-heading{flex-direction:column}}
 @media(max-width:560px){.editorial-desk{padding:17px}.editorial-desk-heading{flex-direction:column}.editorial-count{width:100%;text-align:left;display:flex;align-items:center}}
 @media print{.editorial-desk button,.editorial-decision select{display:none!important}.editorial-desk textarea{border:0;background:white;resize:none;min-height:0}}
+
+/* Partial responses must never look like a complete AI result */
+.partial-result-notice,.partial-rewrite-warning{background:#fff8e8;border:1px solid #ead7a4;border-radius:10px;color:#765623;padding:14px 17px;font-size:12px;line-height:1.75;margin:15px 0}
+.partial-result-notice strong{font-weight:800}
+.partial-rewrite-warning{margin:13px 0 0}
