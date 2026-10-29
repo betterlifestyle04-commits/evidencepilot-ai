@@ -16,6 +16,7 @@ export type AnalysisProviders = {
 
 type ReviewedClaim = Assessment & {
   sources: ReturnType<typeof sourcesFor>;
+  unassessedSources?: ReturnType<typeof sourcesFor>;
   retrievalStatus?: "unavailable" | "empty" | "assessment_unavailable";
   researchPlan?: Omit<ResearchPlan,"queries">;
 };
@@ -107,7 +108,11 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
       return {
         claim: plan.normalizedClaim, verdict: "insufficient_evidence",
         explanation: "Evidence was retrieved, but the assessment service was temporarily unavailable, so no conclusion can be supported.",
-        sourceIndices: [], sources: [], retrievalStatus: "assessment_unavailable", researchPlan: planSummary(plan)
+        // Retain real retrieved URLs for human inspection, without misrepresenting
+        // them as model-cited evidence or assigning a support relationship.
+        sourceIndices: [], sources: [],
+        unassessedSources: sourcesFor(results.slice(0, 4).map((_, index) => index), results),
+        retrievalStatus: "assessment_unavailable", researchPlan: planSummary(plan)
       };
     }
   }

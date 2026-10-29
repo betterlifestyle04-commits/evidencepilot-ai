@@ -97,12 +97,18 @@ function parseClaim(value: unknown): ClaimInsight {
     };
   }
   const evidenceStrength = oneOf<NonNullable<ClaimInsight["evidenceStrength"]>>(c.evidenceStrength, strengthLabels);
-  const retrievalStatus = oneOf<NonNullable<ClaimInsight["retrievalStatus"]>>(c.retrievalStatus, new Set(["empty", "unavailable"]));
+  const retrievalStatus = oneOf<NonNullable<ClaimInsight["retrievalStatus"]>>(c.retrievalStatus, new Set(["empty", "unavailable", "assessment_unavailable"]));
+  let unassessedSources: EvidenceDetail[] | undefined;
+  if (Array.isArray(c.unassessedSources)) {
+    if (c.unassessedSources.length > 8) throw new Error("Too many unassessed source links in the saved report.");
+    unassessedSources = c.unassessedSources.map(parseEvidence);
+  }
   return {
     claim: text(c.claim, 400, "claim"),
     verdict,
     explanation: text(c.explanation, 2000, "assessment"),
     sources: c.sources.map(parseEvidence),
+    unassessedSources: retrievalStatus === "assessment_unavailable" ? unassessedSources : undefined,
     evidenceStrength,
     qualifications: optionalText(c.qualifications, 800),
     researchPlan,

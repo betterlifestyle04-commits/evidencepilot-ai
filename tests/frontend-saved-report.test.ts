@@ -65,3 +65,33 @@ test("restores a partial rewrite status from a saved report", () => {
   const saved = parseSavedReport(JSON.stringify(fixture));
   assert.equal(saved.report.investigation?.rewriteStatus, "unavailable");
 });
+
+test("preserves retrieved-but-unassessed links separately from model citations",()=>{
+  const fixture=exportFixture();
+  const claim=fixture.report.claims[0] as typeof fixture.report.claims[0] & {
+    retrievalStatus?: string;
+    unassessedSources?: {title:string;url:string;snippet:string;publisher:string}[];
+  };
+  claim.verdict="insufficient_evidence";
+  claim.sources=[];
+  claim.retrievalStatus="assessment_unavailable";
+  claim.unassessedSources=[{
+    title:"A real retrieved page",url:"https://science.nasa.gov/mars/",
+    snippet:"A snippet requiring human checking.",publisher:"science.nasa.gov"
+  }];
+  const saved=parseSavedReport(JSON.stringify(fixture));
+  assert.equal(saved.report.claims[0].retrievalStatus,"assessment_unavailable");
+  assert.equal(saved.report.claims[0].sources.length,0);
+  assert.equal(saved.report.claims[0].unassessedSources?.[0].url,"https://science.nasa.gov/mars/");
+  assert.equal(saved.report.claims[0].unassessedSources?.[0].relationship,undefined);
+});
+test("does not import unsafe unassessed research leads",()=>{
+  const fixture=exportFixture();
+  const claim=fixture.report.claims[0] as typeof fixture.report.claims[0] & {
+    retrievalStatus?: string;
+    unassessedSources?: {title:string;url:string;snippet:string}[];
+  };
+  claim.retrievalStatus="assessment_unavailable";
+  claim.unassessedSources=[{title:"Internal",url:"https://localhost/internal",snippet:"Confidential"}];
+  assert.throws(()=>parseSavedReport(JSON.stringify(fixture)),/unsafe source URL/);
+});

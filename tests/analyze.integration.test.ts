@@ -85,6 +85,10 @@ test("returns a partial report when one assessment fails", async () => {
   });
   assert.equal(report.claims[0].verdict, "supported");
   assert.equal(report.claims[1].retrievalStatus, "assessment_unavailable");
+  assert.equal(report.claims[1].sources.length,0,"failed assessment must not invent model citations");
+  assert.equal(report.claims[1].unassessedSources?.length,1,"real retrieved links should remain reviewable");
+  assert.equal(report.claims[1].unassessedSources?.[0].url,"https://example.org/record");
+  assert.equal(report.claims[1].unassessedSources?.[0].relationship,undefined);
   assert.equal(report.claims[1].verdict, "insufficient_evidence");
 });
 test("returns original text when the optional rewrite service fails", async () => {

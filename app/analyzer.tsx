@@ -9,7 +9,7 @@ import ReportComparison from "./report-comparison";
 import EditorialReviewDesk from "./editorial-review-desk";
 import { InvestigationBrief, ReportSectionNavigation } from "./investigation-brief";
 import { editorialDecisionLabels, newEditorialReview, type EditorialDecision } from "./editorial-review";
-import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, type ClaimInsight, type InvestigationSummary } from "./report-insights";
+import { EvidenceTrail, GroundedExplanation, InvestigationOverview, ResearchReasoning, RevisionComparison, UnassessedResearchLeads, type ClaimInsight, type InvestigationSummary } from "./report-insights";
 
 type Verdict = "supported" | "contradicted" | "mixed" | "insufficient_evidence";
 type AnalysisMode = "quick" | "deep";
@@ -51,6 +51,11 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
     lines.push("", item.explanation, "");
     if (item.qualifications) lines.push("**Qualifications:** " + item.qualifications, "");
     if (!item.sources.length) lines.push("No retrieved sources were cited.", "");
+    if (item.unassessedSources?.length) {
+      lines.push("**Retrieved but unassessed leads (NOT AI citations):**");
+      for (const lead of item.unassessedSources) lines.push("- [" + lead.title.replace(/[\[\]]/g, "") + "](" + lead.url + ") — not assessed");
+      lines.push("These links have not been verified or classified as supporting or challenging.", "");
+    }
     else {
       lines.push("**Retrieved sources:**");
       item.sources.forEach((source) => {
@@ -428,6 +433,7 @@ export default function Analyzer() {
               <h3>{claim.claim}</h3><ResearchReasoning claim={claim} /><div className="assessment-label">ASSESSMENT</div><GroundedExplanation text={claim.explanation} sources={claim.sources} claimNumber={index + 1} />
               <div className="source-list"><div className="source-title"><span>RETRIEVED SOURCES</span><span>{claim.sources.length} cited</span></div>
                 <EvidenceTrail sources={claim.sources} claimNumber={index + 1} />
+                <UnassessedResearchLeads sources={claim.unassessedSources} />
               </div>
               <button className="claim-copy" type="button" onClick={() => copyText(claim.claim + "\n\n" + claim.explanation, "Claim assessment")}>Copy assessment ↗</button>
             </article>)}
