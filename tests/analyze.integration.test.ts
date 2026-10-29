@@ -112,3 +112,17 @@ test("returns a bounded partial report before the function deadline", async () =
   assert.equal(report.rewrite, input);
   assert.equal(report.investigation.deadlineReached, true);
 });
+test("reports actual completed model attempts supplied by providers", async () => {
+  const tagged = <T extends object>(value: T, attempts: number) => {
+    Object.defineProperty(value, "providerAttempts", { value: attempts, enumerable: false });
+    return value;
+  };
+  const report = await analyzeContent("Claim input", {
+    extractClaims: async () => tagged(["The Earth revolves around the Sun."], 2),
+    planClaim: async claim => plan(claim),
+    searchClaim: async () => tagged([{ title: "NASA", url: "https://science.nasa.gov/earth/", content: "Earth orbits the Sun." }], 1),
+    assess: async claim => tagged({ claim, verdict: "supported" as const, explanation: "Evidence agrees.", sourceIndices: [0] }, 2),
+    cautiousRewrite: async () => ({ rewrite: "Earth orbits the Sun.", providerAttempts: 2 })
+  }, "quick");
+  assert.deepEqual(report.providerCalls, { nebius: 6, tavily: 1, total: 7 });
+});
