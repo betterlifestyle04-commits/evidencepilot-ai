@@ -13,6 +13,9 @@ const validRequestId = (value: unknown): value is string =>
 export function readRetryAfter(value: string | null, now = Date.now()): number {
   const v = value?.trim() || "";
   if (/^\d{1,5}$/.test(v)) return Math.max(1, Math.min(300, Number(v)));
+  // Retry-After HTTP dates use the standard IMF-fixdate format, not arbitrary
+  // strings that Date.parse may coerce (for example, "-2" or "1").
+  if (!/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(v)) return 60;
   const date = Date.parse(v);
   return Number.isFinite(date) ? Math.max(1, Math.min(300, Math.ceil((date - now) / 1000))) : 60;
 }
