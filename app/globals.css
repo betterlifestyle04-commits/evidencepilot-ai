@@ -304,3 +304,7 @@
 .unassessed-research-leads li>small{display:block;margin:5px 0;color:#7686aa;font-size:10px}
 .unassessed-research-leads li>p{margin:5px 0 0;color:#627496;font-size:11px;line-height:1.6}
 @media print{.unassessed-research-leads li{break-inside:avoid}}
+
+/* Character limits and UTF-8 wire limits are different; report both honestly. */
+.payload-limit-warning{font-size:12px;line-height:1.7;margin:10px 0 12px;padding:12px 14px;color:#8b3d28;background:#fff4ec;border:1px solid #f0d1bc;border-radius:9px}
+@media print{.payload-limit-warning{display:none!important}}
