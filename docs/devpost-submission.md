@@ -81,6 +81,7 @@ Broader multilingual and cross-language evaluation; stronger temporal evidence h
 - How it works: https://evidencepilot-ai-flame.vercel.app/how-it-works
 - Privacy & data handling: https://evidencepilot-ai-flame.vercel.app/privacy
 - Technical evidence methodology: https://github.com/betterlifestyle04-commits/evidencepilot-ai/blob/main/docs/evidence-methodology-v2.md
+- Real Quick/Deep production smoke-check evidence (with limitations): https://github.com/betterlifestyle04-commits/evidencepilot-ai/blob/main/docs/live-integration-check-2026-10-30.md
 - Public YouTube demo: **ADD THE ACTUAL PUBLIC VIDEO URL BEFORE FINAL SUBMISSION**
 
 ## Recommended 2:45 demonstration video (real app, not a mock)
@@ -101,7 +102,8 @@ Broader multilingual and cross-language evaluation; stronger temporal evidence h
 - [ ] Devpost entry explicitly selects **Best Apps and Agents**.
 - [ ] Project title, description, problem, technologies, challenge details and honest limitations are entered.
 - [ ] Production URL opens without sign-in.
-- [ ] Nebius + Tavily **real provider calls** work in Quick Check and Deep Investigation (health endpoint alone is insufficient).
+- [x] One **real provider-backed production call** in each mode returned a structurally valid response (see linked CI logs; not an accuracy certification).
+- [ ] Run a human browser review of a completed report and independently inspect the content of cited source URLs.
 - [ ] Links in one real report open, with at least one independently inspected original source.
 - [ ] JSON export/reopen and manual editorial review have been demonstrated.
 - [ ] GitHub repository is publicly accessible; MIT license and setup README are visible.
