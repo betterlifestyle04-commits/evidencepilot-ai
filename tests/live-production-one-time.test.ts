@@ -3,13 +3,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-test("one-time public Quick Check smoke: real Nebius + Tavily flow", { timeout: 115_000 }, async () => {
+test("one-time public Deep Investigation smoke: real Nebius + Tavily flow", { timeout: 115_000 }, async () => {
   const started = Date.now();
   const response = await fetch("https://evidencepilot-ai-flame.vercel.app/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
     body: JSON.stringify({
-      mode: "quick",
+      mode: "deep",
       content: "The Apollo 11 Moon landing occurred in July 1969."
     }),
     signal: AbortSignal.timeout(105_000)
@@ -32,10 +32,10 @@ test("one-time public Quick Check smoke: real Nebius + Tavily flow", { timeout: 
     error: typeof payload.error === "string" ? payload.error.slice(0, 160) : null,
     note: "Structural live integration probe, NOT an accuracy benchmark"
   }));
-  assert.equal(response.status, 200, "Production API failed live Quick Check");
-  assert.equal(payload.mode, "quick");
+  assert.equal(response.status, 200, "Production API failed live Deep Investigation");
+  assert.equal(payload.mode, "deep");
   assert.ok(claims.length >= 1, "No verifiable claims returned");
-  assert.ok((calls?.nebius || 0) >= 3, "Expected real claim extraction, assessment, and rewrite workflow");
+  assert.ok((calls?.nebius || 0) >= 4, "Expected real claim extraction, research planning, assessment, and rewrite workflow");
   assert.ok((calls?.tavily || 0) >= 1, "Expected a real Tavily search");
   assert.ok(citedUrls.length >= 1, "No usable cited HTTPS sources found");
 });
