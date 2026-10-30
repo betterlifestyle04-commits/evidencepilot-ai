@@ -1,3 +1,4 @@
+import { MAX_REWRITE_INPUT_CHARS, MAX_REWRITE_OUTPUT_CHARS } from "./rewrite-limits";
 import { parseClaims, parseJsonObject, sanitizeSearchResults, type SearchResult, validateAssessment } from "./evidence";
 import type { AnalysisMode } from "./analyze";
 const NEBIUS_API="https://api.tokenfactory.nebius.com/v1", TAVILY="https://api.tavily.com/search";
@@ -6,9 +7,6 @@ async function request(url:string,init:RequestInit,ms=25_000){try{const response
 function key(name:"NEBIUS_API_KEY"|"TAVILY_API_KEY"){const value=process.env[name];if(!value)throw new ProviderError("configuration",`${name==="NEBIUS_API_KEY"?"Nebius":"Tavily"} is not configured.`);return value;}
 const messages=(system:string,user:string)=>[{role:"system" as const,content:system},{role:"user" as const,content:user}];
 async function completion(body:unknown){const data=await request(`${NEBIUS_API}/chat/completions`,{method:"POST",headers:{Authorization:`Bearer ${key("NEBIUS_API_KEY")}`,"Content-Type":"application/json"},body:JSON.stringify(body)});const content=data?.choices?.[0]?.message?.content;if(typeof content!=="string")throw new ProviderError("invalid_response","Nemotron returned no content.");try{return parseJsonObject(content);}catch{throw new ProviderError("invalid_response","Nemotron returned malformed structured data.");}}
-/** A single-pass rewrite must not silently drop the rest of a submitted document. */
-export const MAX_REWRITE_INPUT_CHARS = 6_000;
-export const MAX_REWRITE_OUTPUT_CHARS = 8_000;
 const configuredModel=()=>process.env.NEBIUS_MODEL||"nvidia/nemotron-3-super-120b-a12b";
 async function chatJson(input:{role:"system"|"user";content:string}[],temperature=0.1):Promise<Record<string,unknown>>{const body={model:configuredModel(),messages:input,temperature,response_format:{type:"json_object"}};try{return await completion(body);}catch(error){if(!(error instanceof ProviderError)||error.kind!=="unsupported_format")throw error;return completion({...body,messages:[...input,{role:"system" as const,content:"Your entire response must be one valid JSON object, with no Markdown or commentary."}],response_format:undefined});}}
 export async function verifyNebiusModel(){const data=await request(`${NEBIUS_API}/models`,{headers:{Authorization:`Bearer ${key("NEBIUS_API_KEY")}`}},15_000);const model=configuredModel();if(!Array.isArray(data?.data)||!data.data.some((entry:unknown)=>typeof entry==="object"&&entry!==null&&(entry as {id?:unknown}).id===model))throw new ProviderError("invalid_response","Configured NVIDIA Nemotron model is not in the account catalog.");const probe=await chatJson(messages("Return JSON only: {\"ok\":true}.","Run the structured-output compatibility check."));if(probe.ok!==true)throw new ProviderError("invalid_response","Nemotron structured JSON compatibility check failed.");return model;}
