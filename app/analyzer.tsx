@@ -93,8 +93,12 @@ function publishableDraft(report: Report, draft: string) {
 export default function Analyzer() {
   const [content, setContent] = useState("");
   const [report, setReport] = useState<Report | null>(null);
+  // A new saved or live report must reset any previously imported comparison baseline,
+  // even when completedAt and submitted text happen to match.
+  const [reportVersion, setReportVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const requestInFlight = useRef(false);
+  const fileReadGeneration = useRef(0);
   const [retryUntil, setRetryUntil] = useState<number | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [suggestQuick, setSuggestQuick] = useState(false);
@@ -123,7 +127,14 @@ export default function Analyzer() {
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
   useEffect(() => {
-    if (report) document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!report) return;
+    // An async report update must be announced to keyboard/screen-reader users.
+    const heading = document.getElementById("results-title");
+    heading?.focus({ preventScroll: true });
+    document.getElementById("results")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start"
+    });
   }, [report]);
 
   useEffect(() => {
@@ -157,6 +168,7 @@ export default function Analyzer() {
 
   function useExample(text: string) {
     if (requestInFlight.current) return;
+    fileReadGeneration.current++;
     setNoCheckableClaims(false);
     setContent(text);
     setReport(null);
@@ -167,16 +179,22 @@ export default function Analyzer() {
 
   async function openSavedReport(file: File | undefined) {
     if (!file) return;
+    const generation = ++fileReadGeneration.current;
     if (!/\.json$/i.test(file.name) || file.size > 250_000) {
       setError("Choose an EvidencePilot JSON report smaller than 250 KB.");
       return;
     }
     try {
       const saved = parseSavedReport(await file.text());
-      setBusy(false);
+      if (generation !== fileReadGeneration.current) return;
+      if (requestInFlight.current) {
+        setNotice("An analysis is still running. Reopen your saved report after it finishes.");
+        return;
+      }
       setContent(saved.original);
       setSubmittedContent(saved.original);
       setReport(saved.report);
+      setReportVersion(version => version + 1);
       setReviewedUrls(saved.reviewedUrls);
       setSourceNotes(saved.sourceNotes);
       setEditorialDraft(saved.editorialReview.draft);
@@ -187,6 +205,7 @@ export default function Analyzer() {
       setError("");
       setNotice("Saved report reopened locally. No new AI analysis or web search was performed.");
     } catch (caught) {
+      if (generation !== fileReadGeneration.current) return;
       setError(caught instanceof Error ? caught.message : "Unable to open the saved report.");
       setNotice("");
     }
@@ -194,6 +213,7 @@ export default function Analyzer() {
 
   async function importTextFile(file: File | undefined) {
     if (!file) return;
+    const generation = ++fileReadGeneration.current;
     setReport(null);
     setImportedReport(false);
     setError("");
@@ -208,6 +228,7 @@ export default function Analyzer() {
     }
     try {
       const text = (await file.text()).replace(/^\uFEFF/, "");
+      if (generation !== fileReadGeneration.current) return;
       if (text.length > 12_000) {
         setError("This file exceeds the 12,000-character limit. Shorten it before importing.");
         return;
@@ -218,6 +239,7 @@ export default function Analyzer() {
         : "Document imported locally. No text is transmitted until you select Analyze.");
       document.getElementById("content")?.focus();
     } catch {
+      if (generation !== fileReadGeneration.current) return;
       setError("We could not read this file. Please paste the text manually.");
     }
   }
@@ -225,6 +247,7 @@ export default function Analyzer() {
   async function analyze() {
     if (!canAnalyze || requestInFlight.current) return;
     requestInFlight.current = true;
+    fileReadGeneration.current++;
     setBusy(true);
     setSuggestQuick(false);
     setNoCheckableClaims(false);
@@ -263,6 +286,7 @@ export default function Analyzer() {
       setCompletedAt(new Date().toISOString());
       setImportedReport(false);
       setReport(payload as Report);
+      setReportVersion(version => version + 1);
       setNotice("Analysis complete. Review the original sources before relying on the conclusions.");
     } catch (caught) {
       const timeout = caught instanceof Error && (caught.name === "TimeoutError" || caught.name === "AbortError");
@@ -350,7 +374,7 @@ export default function Analyzer() {
               placeholder="Paste something worth checking...&#10;&#10;Example: The first iPhone was introduced in 2007. The original iPhone supported 5G connectivity."
               aria-describedby="text-guidance"
             />
-            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
+            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { fileReadGeneration.current++; setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
             {oversizedPayload && <p className="payload-limit-warning" role="alert">This text uses {payloadBytes.toLocaleString()} UTF-8 JSON request bytes, exceeding the 16 KB demo limit. Shorten it before analyzing. Accents, Arabic and emoji may take more than one byte per character.</p>}
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
             <div className="saved-report-import">
@@ -411,7 +435,7 @@ export default function Analyzer() {
 
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
-          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title" tabIndex={-1}>Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
           {pendingUnanalyzedEdits && !busy && <p className="previous-report-note" role="status"><strong>Input changed since this report:</strong> The findings below refer to the previously analyzed text, not the passage now in the editor. Run a new analysis to update them.</p>}
           {!busy && !error && report.mode !== mode && !importedReport && <p className="previous-report-note">This saved result used {report.mode === "deep" ? "Deep Investigation" : "Quick Check"}. The selected mode applies only to your next request.</p>}
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
@@ -423,7 +447,7 @@ export default function Analyzer() {
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
           <EvidenceCoverageBoard claims={report.claims} />
-          <ReportComparison key={completedAt || submittedContent} current={report} completedAt={completedAt}/>
+          <ReportComparison key={reportVersion} current={report} completedAt={completedAt}/>
           <div className="report-list" id="claim-assessments">
             {report.claims.map((claim, index) => <article className="claim-card" key={index} id={"claim-" + (index + 1)}>
               <div className="claim-card-head"><span className="claim-index">CLAIM {String(index + 1).padStart(2, "0")}</span><span className={"verdict verdict-" + claim.verdict}>{verdicts[claim.verdict].label}</span></div>
