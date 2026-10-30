@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisFailure } from "./analysis-feedback";
 import { readAnalysisPayload } from "./analysis-response";
+import { getAnalysisReadiness } from "./analyze-readiness";
 import { hasUnanalyzedEdits } from "./report-state";
 import { markdownEvidenceSection } from "./report-evidence-markdown";
 import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-body";
@@ -123,7 +124,8 @@ export default function Analyzer() {
   const waitSeconds = retryUntil ? Math.max(0, Math.ceil((retryUntil - timerNow) / 1000)) : 0;
   const payloadBytes = useMemo(() => analysisPayloadBytes(content, mode), [content, mode]);
   const oversizedPayload = payloadBytes > MAX_ANALYSIS_BODY_BYTES;
-  const canAnalyze = content.trim().length >= 20 && content.length <= 12_000 && !oversizedPayload && !busy && waitSeconds === 0;
+  const readiness = getAnalysisReadiness(content, payloadBytes, busy, waitSeconds);
+  const canAnalyze = readiness.canAnalyze;
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes, editorialDraft, editorialDecisions) : "";
   const pendingUnanalyzedEdits = hasUnanalyzedEdits(Boolean(report), content, submittedContent);
   const rewriteUnavailable = Boolean(report?.investigation?.rewriteStatus);
@@ -420,7 +422,8 @@ export default function Analyzer() {
               </button>
             </div>
             <div className="input-divider" />
-            <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze}>{busy ? <><span className="button-spinner" /> Analyzing…</> : waitSeconds > 0 ? <>Retry in {waitSeconds}s</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
+            <div className="form-bottom"><div><strong>Up to three claims · {mode === "quick" ? "Quick Check" : "Deep Investigation"}</strong><span>AI-assisted research. Press Ctrl+Enter (or ⌘+Enter) to analyze.</span></div><button type="button" className="analyze-button" onClick={analyze} disabled={!canAnalyze} aria-describedby="analysis-readiness">{busy ? <><span className="button-spinner" /> Analyzing…</> : waitSeconds > 0 ? <>Retry in {waitSeconds}s</> : <>{mode === "quick" ? "Run quick check" : "Investigate deeply"} <span aria-hidden="true">↗</span></>}</button></div>
+            <p id="analysis-readiness" className={"analysis-readiness analysis-readiness-" + readiness.state}>{readiness.explanation}</p>
             {busy && report && <p className="previous-report-note" role="status">Your previous report remains available below while a new analysis runs. It is not a result of the new request.</p>}
             {busy && <div className="busy-state" role="status"><span className="button-spinner" /> Live {mode === "deep" ? "deep investigation" : "quick check"} in progress. <span className="busy-duration" aria-hidden="true">{elapsedSeconds}s elapsed.</span> Provider requests may take some time; this is a real timer, not simulated research stages.</div>}
             {error && <div className={"error-banner" + (noCheckableClaims ? " no-claims-feedback" : "")} role="alert"><strong>{noCheckableClaims ? "No checkable claims found" : "Analysis unavailable"}</strong><span>{error}</span>

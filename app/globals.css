@@ -324,3 +324,9 @@
 .report-outdated-actions .previous-report-note{border:0;background:transparent;margin:0;flex:1 1 320px}
 .report-outdated-actions .secondary-button{flex:0 0 auto}
 @media print{.report-outdated-actions button{display:none!important}}
+
+/* Helpful explanation beside disabled Analyze action (not an error banner). */
+.analysis-readiness{font-size:11px;line-height:1.6;margin:10px 1px 12px;color:#64766a}
+.analysis-readiness-ready{color:#346d4f}
+.analysis-readiness-cooldown,.analysis-readiness-oversized{color:#865c39}
+@media print{.analysis-readiness{display:none!important}}
