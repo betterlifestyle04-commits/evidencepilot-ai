@@ -314,3 +314,7 @@
 .skip-link:focus,.skip-link:focus-visible{transform:translateY(0);outline:3px solid #a3e0bc;outline-offset:3px}
 @media print{.skip-link{display:none!important}}
 .compare-status-strength_changed{background:#ebf3ff;color:#325a8e}
+
+/* Disclose when claim assessment will not include a full AI rewrite. */
+.rewrite-length-warning{font-size:12px;line-height:1.7;margin:10px 0 12px;padding:12px 14px;color:#395772;background:#f2f7fc;border:1px solid #cbddeb;border-radius:9px}
+@media print{.rewrite-length-warning{display:none!important}}
