@@ -9,6 +9,7 @@ import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-bo
 import { MAX_REWRITE_INPUT_CHARS } from "../lib/rewrite-limits";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
+import { parseTextImport } from "./text-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
 import ReportComparison from "./report-comparison";
 import EditorialReviewDesk from "./editorial-review-desk";
@@ -217,33 +218,30 @@ export default function Analyzer() {
   async function importTextFile(file: File | undefined) {
     if (!file) return;
     const generation = ++fileReadGeneration.current;
-    setReport(null);
-    setImportedReport(false);
-    setError("");
-    setNotice("");
-    if (!/\.(txt|md)$/i.test(file.name)) {
-      setError("Please select a .txt or .md document. Other file types are not supported yet.");
-      return;
-    }
-    if (file.size > 60_000) {
-      setError("The file is too large for this demo. Import a short excerpt instead.");
-      return;
-    }
     try {
-      const text = (await file.text()).replace(/^\uFEFF/, "");
+      // Validate before changing any editor or report state. A bad document must
+      // never destroy a previously completed investigation and its human notes.
+      const text = await parseTextImport(file);
       if (generation !== fileReadGeneration.current) return;
-      if (text.length > 12_000) {
-        setError("This file exceeds the 12,000-character limit. Shorten it before importing.");
+      if (requestInFlight.current) {
+        setNotice("An analysis is running. Import your document after it finishes.");
         return;
       }
       setContent(text);
-      setNotice(analysisPayloadBytes(text, mode) > MAX_ANALYSIS_BODY_BYTES
-        ? "Document imported locally but exceeds the 16 KB request limit. Shorten it before analyzing."
-        : "Document imported locally. No text is transmitted until you select Analyze.");
+      setNoCheckableClaims(false);
+      setError("");
+      const exceedsBytes = analysisPayloadBytes(text, mode) > MAX_ANALYSIS_BODY_BYTES;
+      setNotice(exceedsBytes
+        ? "Text imported locally, but its JSON request exceeds 16 KB. Shorten it before analyzing. Your last report remains unchanged."
+        : report
+          ? "Text imported locally. The previous report and review notes are preserved below; run Analyze to check the new text."
+          : "Text imported locally. No text is sent to AI providers until you select Analyze.");
       document.getElementById("content")?.focus();
-    } catch {
+    } catch (caught) {
       if (generation !== fileReadGeneration.current) return;
-      setError("We could not read this file. Please paste the text manually.");
+      setNoCheckableClaims(false);
+      setError(caught instanceof Error ? caught.message : "We could not read this file. Please paste the text manually.");
+      setNotice("");
     }
   }
 
