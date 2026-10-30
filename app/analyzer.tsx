@@ -98,6 +98,7 @@ export default function Analyzer() {
   const [reportVersion, setReportVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const requestInFlight = useRef(false);
+  const fileReadGeneration = useRef(0);
   const [retryUntil, setRetryUntil] = useState<number | null>(null);
   const [timerNow, setTimerNow] = useState(() => Date.now());
   const [suggestQuick, setSuggestQuick] = useState(false);
@@ -167,6 +168,7 @@ export default function Analyzer() {
 
   function useExample(text: string) {
     if (requestInFlight.current) return;
+    fileReadGeneration.current++;
     setNoCheckableClaims(false);
     setContent(text);
     setReport(null);
@@ -177,12 +179,14 @@ export default function Analyzer() {
 
   async function openSavedReport(file: File | undefined) {
     if (!file) return;
+    const generation = ++fileReadGeneration.current;
     if (!/\.json$/i.test(file.name) || file.size > 250_000) {
       setError("Choose an EvidencePilot JSON report smaller than 250 KB.");
       return;
     }
     try {
       const saved = parseSavedReport(await file.text());
+      if (generation !== fileReadGeneration.current) return;
       if (requestInFlight.current) {
         setNotice("An analysis is still running. Reopen your saved report after it finishes.");
         return;
@@ -201,6 +205,7 @@ export default function Analyzer() {
       setError("");
       setNotice("Saved report reopened locally. No new AI analysis or web search was performed.");
     } catch (caught) {
+      if (generation !== fileReadGeneration.current) return;
       setError(caught instanceof Error ? caught.message : "Unable to open the saved report.");
       setNotice("");
     }
@@ -208,6 +213,7 @@ export default function Analyzer() {
 
   async function importTextFile(file: File | undefined) {
     if (!file) return;
+    const generation = ++fileReadGeneration.current;
     setReport(null);
     setImportedReport(false);
     setError("");
@@ -222,6 +228,7 @@ export default function Analyzer() {
     }
     try {
       const text = (await file.text()).replace(/^\uFEFF/, "");
+      if (generation !== fileReadGeneration.current) return;
       if (text.length > 12_000) {
         setError("This file exceeds the 12,000-character limit. Shorten it before importing.");
         return;
@@ -232,6 +239,7 @@ export default function Analyzer() {
         : "Document imported locally. No text is transmitted until you select Analyze.");
       document.getElementById("content")?.focus();
     } catch {
+      if (generation !== fileReadGeneration.current) return;
       setError("We could not read this file. Please paste the text manually.");
     }
   }
@@ -239,6 +247,7 @@ export default function Analyzer() {
   async function analyze() {
     if (!canAnalyze || requestInFlight.current) return;
     requestInFlight.current = true;
+    fileReadGeneration.current++;
     setBusy(true);
     setSuggestQuick(false);
     setNoCheckableClaims(false);
@@ -365,7 +374,7 @@ export default function Analyzer() {
               placeholder="Paste something worth checking...&#10;&#10;Example: The first iPhone was introduced in 2007. The original iPhone supported 5G connectivity."
               aria-describedby="text-guidance"
             />
-            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
+            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { fileReadGeneration.current++; setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
             {oversizedPayload && <p className="payload-limit-warning" role="alert">This text uses {payloadBytes.toLocaleString()} UTF-8 JSON request bytes, exceeding the 16 KB demo limit. Shorten it before analyzing. Accents, Arabic and emoji may take more than one byte per character.</p>}
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
             <div className="saved-report-import">
