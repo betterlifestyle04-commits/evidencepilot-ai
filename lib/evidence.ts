@@ -47,20 +47,26 @@ export function sanitizeSearchResults(results: SearchResult[], limit = 8): Searc
  */
 export function rankSearchResults(results: SearchResult[], claim: string): SearchResult[] {
   const stopWords = new Set(["that", "this", "with", "from", "were", "have", "been", "their", "there", "which", "largest", "biggest"]);
-  const terms = [...new Set((claim.toLowerCase().match(/[a-z0-9]{4,}/g) || []).filter(term => !stopWords.has(term)))];
+  // NFKD + Unicode mark removal aligns accented query/source spellings
+  // (café/cafe, Arabic diacritics, etc.) without transliterating or translating.
+  // Unicode letter tokens also support Arabic, Cyrillic, Greek and other scripts.
+  const normalize = (value: string) => value.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "");
+  const terms = [...new Set((normalize(claim).match(/[\p{L}\p{N}]{3,}/gu) || []).filter(term => !stopWords.has(term)))];
   const categoryWeight: Record<SourceType, number> = {
     primary: 11, academic: 9, established_reporting: 5, unknown: 1, commentary: -2, social_media: -5
   };
   const score = (source: SearchResult) => {
-    const title = String(source.title || "").toLowerCase();
-    const excerpt = String(source.content || "").toLowerCase();
+    const title = normalize(String(source.title || ""));
+    const excerpt = normalize(String(source.content || ""));
     const titleMatches = terms.filter(term => title.includes(term)).length;
     const excerptMatches = terms.filter(term => excerpt.includes(term)).length;
     const relevance = titleMatches * 3 + excerptMatches;
     // A generic official page should not outrank a highly relevant result.
     return relevance === 0 ? -100 : relevance * 2 + categoryWeight[categorizeSource(source)];
   };
-  return [...results].sort((a,b) => score(b) - score(a) || String(a.title || "").localeCompare(String(b.title || "")));
+  // Modern JavaScript sort is stable: ties retain Tavily's original order,
+  // which is preferable to arbitrary alphabetical reshuffling.
+  return [...results].sort((a,b) => score(b) - score(a));
 }
 
 export function parseJsonObject(raw: string): Record<string, unknown> {
