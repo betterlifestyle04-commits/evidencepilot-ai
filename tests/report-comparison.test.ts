@@ -45,7 +45,7 @@ test("detects changed evidence strength even when verdicts and URL lists are ide
   const result = compareReports(old, now);
   assert.equal(result.changedVerdicts, 0);
   assert.equal(result.changedSources, 0);
-  assert.equal(result.rows[0].kind, "sources_changed");
+  assert.equal(result.rows[0].kind, "strength_changed");
   assert.equal(result.rows[0].strengthChanged, true);
 });
 test("deduplicates cited URLs and handles repeated claim text one-to-one", () => {
@@ -65,4 +65,58 @@ test("comparison export discloses uncertainty and lists real source URLs", () =>
   assert.match(markdown, /not a re-verification/);
   assert.match(markdown, /science\.nasa\.gov/);
   assert.match(markdown, /Changed verdicts: 0/);
+});
+
+test("ignores tracking-only citation changes while preserving original links", () => {
+  const earlier = report(claim("A checkable statement.", "supported", [
+    "https://example.org/article/?id=42&utm_source=old"
+  ]));
+  const current = report(claim("A checkable statement.", "supported", [
+    "https://example.org/article?id=42&utm_campaign=new&fbclid=xyz"
+  ]));
+  const compared = compareReports(earlier, current);
+  assert.equal(compared.changedSources, 0);
+  assert.equal(compared.rows[0].kind, "same");
+  assert.deepEqual(compared.rows[0].addedSources, []);
+  assert.deepEqual(compared.rows[0].removedSources, []);
+});
+test("preserves meaningful video and article identity parameters", () => {
+  const earlier = report(claim("A checkable statement.", "supported", [
+    "https://www.youtube.com/watch?v=oldVideo", "https://example.org/article?id=42"
+  ]));
+  const current = report(claim("A checkable statement.", "supported", [
+    "https://www.youtube.com/watch?v=newVideo", "https://example.org/article?id=43"
+  ]));
+  const compared = compareReports(earlier, current);
+  assert.equal(compared.changedSources, 1);
+  assert.deepEqual(compared.rows[0].addedSources, [
+    "https://www.youtube.com/watch?v=newVideo", "https://example.org/article?id=43"
+  ]);
+  assert.deepEqual(compared.rows[0].removedSources, [
+    "https://www.youtube.com/watch?v=oldVideo", "https://example.org/article?id=42"
+  ]);
+});
+test("deduplicates tracking versions of the same source within a saved report", () => {
+  const earlier = report(claim("A checkable statement.", "supported", [
+    "https://example.org/article?id=42&utm_source=one",
+    "https://example.org/article?id=42&utm_source=two"
+  ]));
+  const current = report(claim("A checkable statement.", "supported", [
+    "https://example.org/article?id=42"
+  ]));
+  const compared = compareReports(earlier, current);
+  assert.equal(compared.rows[0].kind, "same");
+  assert.equal(compared.changedSources, 0);
+});
+test("does not call an evidence-strength-only change a new source trail", () => {
+  const earlier = report(claim("A checkable statement.", "supported", [
+    "https://example.org/article?id=42"
+  ], "limited"));
+  const current = report(claim("A checkable statement.", "supported", [
+    "https://example.org/article?id=42"
+  ], "moderate"));
+  const compared = compareReports(earlier, current);
+  assert.equal(compared.rows[0].kind, "strength_changed");
+  assert.equal(compared.changedSources, 0);
+  assert.equal(compared.rows[0].strengthChanged, true);
 });
