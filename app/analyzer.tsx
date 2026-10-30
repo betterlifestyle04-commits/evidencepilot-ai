@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisFailure } from "./analysis-feedback";
 import { readAnalysisPayload } from "./analysis-response";
 import { hasUnanalyzedEdits } from "./report-state";
+import { markdownEvidenceSection } from "./report-evidence-markdown";
 import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-body";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
@@ -53,21 +54,7 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
     if (item.evidenceStrength) lines.push("**Evidence strength:** " + item.evidenceStrength);
     lines.push("", item.explanation, "");
     if (item.qualifications) lines.push("**Qualifications:** " + item.qualifications, "");
-    if (!item.sources.length) lines.push("No retrieved sources were cited.", "");
-    if (item.unassessedSources?.length) {
-      lines.push("**Retrieved but unassessed leads (NOT AI citations):**");
-      for (const lead of item.unassessedSources) lines.push("- [" + lead.title.replace(/[\[\]]/g, "") + "](" + lead.url + ") — not assessed");
-      lines.push("These links have not been verified or classified as supporting or challenging.", "");
-    }
-    else {
-      lines.push("**Retrieved sources:**");
-      item.sources.forEach((source) => {
-        lines.push("- [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")" + (source.relationship ? " — " + source.relationship : ""));
-        if (source.relevance) lines.push("  - Relevance: " + source.relevance);
-        if (source.limitations) lines.push("  - Limitations: " + source.limitations);
-      });
-      lines.push("");
-    }
+    lines.push(...markdownEvidenceSection(item));
   });
   lines.push(report.investigation?.rewriteStatus === "unavailable" ? "## Original text retained (AI rewrite unavailable)" : "## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
   for (const source of uniqueCitedSources(report.claims)) {
