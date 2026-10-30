@@ -6,6 +6,7 @@ import { readAnalysisPayload } from "./analysis-response";
 import { hasUnanalyzedEdits } from "./report-state";
 import { markdownEvidenceSection } from "./report-evidence-markdown";
 import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-body";
+import { MAX_REWRITE_INPUT_CHARS } from "../lib/rewrite-limits";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
 import EvidenceCoverageBoard from "./evidence-coverage-board";
@@ -39,6 +40,7 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
     "",
     "This is AI-assisted research. Sources must be reviewed independently.",
     ...(report.investigation?.rewriteStatus === "unavailable" ? ["Warning: AI rewriting was unavailable. The report retains the original submitted text, not a verified correction."] : []),
+    ...(report.investigation?.rewriteStatus === "skipped_for_length" ? ["Warning: Full-document rewriting was intentionally skipped because the original exceeds 6,000 characters. The complete original text was retained; this is not an AI correction."] : []),
     ...(completedAt ? ["Analysis completed (UTC): " + completedAt] : []),
     "",
     "## Original submitted text",
@@ -56,7 +58,7 @@ function reportMarkdown(report: Report, original: string, reviewedUrls: string[]
     if (item.qualifications) lines.push("**Qualifications:** " + item.qualifications, "");
     lines.push(...markdownEvidenceSection(item));
   });
-  lines.push(report.investigation?.rewriteStatus === "unavailable" ? "## Original text retained (AI rewrite unavailable)" : "## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
+  lines.push(report.investigation?.rewriteStatus ? "## Original text retained (AI full rewrite not produced)" : "## Suggested cautious rewrite", "", report.rewrite, "", "## Reader source-review checklist", "", "These marks are recorded manually by the reader, not independent verification.", "");
   for (const source of uniqueCitedSources(report.claims)) {
     lines.push("- [" + (reviewedUrls.includes(source.url) ? "x" : " ") + "] [" + source.title.replace(/[\[\]]/g, "") + "](" + source.url + ")");
     const note = sourceNotes[source.url]?.trim();
@@ -123,6 +125,7 @@ export default function Analyzer() {
   const canAnalyze = content.trim().length >= 20 && content.length <= 12_000 && !oversizedPayload && !busy && waitSeconds === 0;
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes, editorialDraft, editorialDecisions) : "";
   const pendingUnanalyzedEdits = hasUnanalyzedEdits(Boolean(report), content, submittedContent);
+  const rewriteUnavailable = Boolean(report?.investigation?.rewriteStatus);
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
@@ -376,6 +379,7 @@ export default function Analyzer() {
             />
             <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { fileReadGeneration.current++; setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
             {oversizedPayload && <p className="payload-limit-warning" role="alert">This text uses {payloadBytes.toLocaleString()} UTF-8 JSON request bytes, exceeding the 16 KB demo limit. Shorten it before analyzing. Accents, Arabic and emoji may take more than one byte per character.</p>}
+            {content.length > MAX_REWRITE_INPUT_CHARS && <p className="rewrite-length-warning">Long document: claim-by-claim analysis is available, but a complete AI rewrite is limited to 6,000 characters. Your original document will be retained unchanged for manual editing; no text will be silently omitted.</p>}
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
             <div className="saved-report-import">
               <label className="import-file import-report">↗ Reopen saved report (.json)
@@ -439,10 +443,10 @@ export default function Analyzer() {
           {pendingUnanalyzedEdits && !busy && <p className="previous-report-note" role="status"><strong>Input changed since this report:</strong> The findings below refer to the previously analyzed text, not the passage now in the editor. Run a new analysis to update them.</p>}
           {!busy && !error && report.mode !== mode && !importedReport && <p className="previous-report-note">This saved result used {report.mode === "deep" ? "Deep Investigation" : "Quick Check"}. The selected mode applies only to your next request.</p>}
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
-          {(report.investigation?.partialClaims || report.investigation?.rewriteStatus === "unavailable") && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}
+          {(report.investigation?.partialClaims || rewriteUnavailable) && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation?.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation?.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}{report.investigation?.rewriteStatus === "skipped_for_length" ? "Full-text rewriting was skipped because the input exceeds 6,000 characters; all original text remains intact. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}
           <ReportSectionNavigation />
           <InvestigationBrief claims={report.claims} mode={report.mode} completedAt={completedAt} reviewedUrls={reviewedUrls}
-            rewriteUnavailable={report.investigation?.rewriteStatus === "unavailable"} onCopy={copyText} />
+            rewriteUnavailable={rewriteUnavailable} onCopy={copyText} />
           <div className="summary-grid"><div className="summary-item"><strong>{report.claims.length}</strong><span>Claims reviewed</span></div><div className="summary-item success"><strong>{counts.supported}</strong><span>Supported</span></div><div className="summary-item danger"><strong>{counts.contradicted}</strong><span>Contradicted</span></div><div className="summary-item caution"><strong>{counts.mixed + counts.insufficient_evidence}</strong><span>Need context</span></div></div>
           {report.claims.some(claim => claim.researchPlan?.timeSensitive) && <p className="time-sensitive-warning"><strong>Time-sensitive investigation:</strong> One or more claims depend on dates or changing conditions. Re-check the original sources before using this report later.</p>}
           <InvestigationOverview summary={report.investigation} />
@@ -460,11 +464,11 @@ export default function Analyzer() {
             </article>)}
           </div>
           <SourceReviewDesk claims={report.claims} reviewedUrls={reviewedUrls} onToggle={toggleReviewedSource} sourceNotes={sourceNotes} onNoteChange={changeSourceNote} />
-          <div className="rewrite-panel" id="report-rewrite"><div className="rewrite-heading"><div><span className="step-index">{report.investigation?.rewriteStatus === "unavailable" ? "REWRITE UNAVAILABLE" : "SUGGESTED REVISION"}</span><h3>{report.investigation?.rewriteStatus === "unavailable" ? "Original text retained — edit cautiously." : "Say what the evidence supports."}</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, "Rewritten text")}>Copy rewrite ↗</button></div></div>{report.investigation?.rewriteStatus === "unavailable" && <p className="partial-rewrite-warning">Nemotron could not produce the cautious rewrite for this run. The text shown here is the unmodified original, not an AI correction.</p>}<RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
+          <div className="rewrite-panel" id="report-rewrite"><div className="rewrite-heading"><div><span className="step-index">{rewriteUnavailable ? "FULL REWRITE NOT PRODUCED" : "SUGGESTED REVISION"}</span><h3>{rewriteUnavailable ? "Original text retained — edit cautiously." : "Say what the evidence supports."}</h3></div><div className="result-actions"><button className="secondary-button" type="button" onClick={() => window.print()}>Print / Save PDF</button><button className="secondary-button" type="button" onClick={() => copyText(publishableDraft(report, editorialDraft), "Working draft with sources")}>Copy working draft with sources</button><button className="secondary-button" type="button" onClick={() => copyText(report.rewrite, rewriteUnavailable ? "Original text" : "Rewritten text")}>{rewriteUnavailable ? "Copy original ↗" : "Copy rewrite ↗"}</button></div></div>{rewriteUnavailable && <p className="partial-rewrite-warning">{report.investigation?.rewriteStatus === "skipped_for_length" ? "The complete original text is preserved because this document exceeds the 6,000-character full-rewrite limit. Claim assessments still ran; no partial rewrite was presented as complete." : "Nemotron could not produce the cautious rewrite for this run. The text shown here is the unmodified original, not an AI correction."}</p>}<RevisionComparison original={submittedContent} rewrite={report.rewrite} /></div>
           <EditorialReviewDesk claims={report.claims} aiRewrite={report.rewrite} draft={editorialDraft} decisions={editorialDecisions}
             reviewedSourceCount={uniqueCitedSources(report.claims).filter(source => reviewedUrls.includes(source.url)).length}
             totalSourceCount={uniqueCitedSources(report.claims).length}
-            onChangeDraft={setEditorialDraft} onSetDecision={setEditorialDecision} rewriteUnavailable={report.investigation?.rewriteStatus === "unavailable"} />
+            onChangeDraft={setEditorialDraft} onSetDecision={setEditorialDecision} rewriteUnavailable={rewriteUnavailable} />
           {content !== submittedContent && <p className="result-stale-note">You have edited the input since this analysis. The report still reflects the original submitted text.</p>}
           <p className="report-disclaimer">Model: {report.model}. {report.providerCalls ? "This run used " + report.providerCalls.total + " reported provider calls. " : ""}This is AI-assisted evidence analysis, not a definitive fact-check. Retrieved sources have not been independently authenticated.</p>
         </section>
