@@ -4,10 +4,7 @@ Official rules: https://nebiusglobalaihackathon.devpost.com/rules
 Official overview: https://nebiusglobalaihackathon.devpost.com/  
 Deadline: **Friday, October 30, 2026 at 10:00 a.m. PDT = 18:00 Europe/Oslo.**
 
-**DO NOT CONFUSE A SAVED DRAFT WITH A SUBMISSION.** Devpost's October 27 email confirmed an unfinished draft initially named “Untitled.” No later successful-submission confirmation was found in the connected mailbox during the October 30 review. Check Devpost itself before considering it submitted.
-
-**Existing submission editor from the original draft email:**  
-https://devpost.com/submit-to/30790-nebius-x-nvidia-global-ai-hackathon/manage/submissions/1268203/edit
+**DO NOT CONFUSE A SAVED DRAFT WITH A SUBMISSION.** Open your own Devpost account's submission editor from [the official hackathon site](https://nebiusglobalaihackathon.devpost.com/) or **My projects**, verify the existing entry, then use the final Submit action. A saved draft is not an accepted entry. Keep private draft-editor links out of the public source repository.
 
 ## Verifiable requirement inventory
 
@@ -53,7 +50,7 @@ https://devpost.com/submit-to/30790-nebius-x-nvidia-global-ai-hackathon/manage/s
 ## Last-mile user actions, in order
 
 1. **Record/upload the public YouTube video first** using [docs/demo-video-script.md](demo-video-script.md) and copy its watch URL. The video must show the real application working and name Nemotron/Nebius.
-2. Open the **existing draft editor** above; name the project `EvidencePilot` (the October 27 draft email said “Untitled”).
+2. Open the **existing draft editor** above; name the project `EvidencePilot` and verify the name is correct in the submission preview.
 3. Select **Best Apps and Agents**; fill the text fields from the Devpost pack; insert both actual URLs (app and GitHub); fill all required `Built With` fields.
 4. Insert **your actual public YouTube URL**; add optional real screenshots or a thumbnail if Devpost allows/requests them.
 5. Read the separate [feedback draft](submission-feedback.md) and enter accurate Nebius, NVIDIA and Tavily feedback. Say explicitly that **Nebius AI Cloud was not used**, if the form asks.
