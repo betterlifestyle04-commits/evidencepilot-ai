@@ -1,5 +1,6 @@
 import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor, type Assessment, type SearchResult } from "./evidence";
-import { MAX_REWRITE_INPUT_CHARS, ProviderError, type ResearchPlan } from "./providers";
+import { ProviderError, type ResearchPlan } from "./providers";
+import { MAX_REWRITE_INPUT_CHARS } from "./rewrite-limits";
 
 export type AnalysisMode = "quick" | "deep";
 /** Expected, non-provider error: the supplied text has no checkable facts. */
