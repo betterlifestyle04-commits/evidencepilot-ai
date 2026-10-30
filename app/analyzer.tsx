@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisFailure } from "./analysis-feedback";
+import { readAnalysisPayload } from "./analysis-response";
 import { hasUnanalyzedEdits } from "./report-state";
 import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-body";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
@@ -252,8 +253,7 @@ export default function Analyzer() {
         body: JSON.stringify({ content: submitted, mode }),
         signal: AbortSignal.timeout(75_000)
       });
-      const data: unknown = await response.json();
-      const payload = data as Partial<Report> & { error?: string; requestId?: string };
+      const payload = await readAnalysisPayload(response) as Partial<Report> & { error?: string; requestId?: string };
       if (!response.ok) {
         setNoCheckableClaims(response.status === 422 && (payload as { code?: unknown }).code === "NO_CHECKABLE_CLAIMS");
         const feedback = analysisFailure(response.status, payload, response.headers.get("retry-after"));
