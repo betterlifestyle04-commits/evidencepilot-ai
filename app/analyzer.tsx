@@ -184,7 +184,7 @@ export default function Analyzer() {
     try {
       const saved = parseSavedReport(await file.text());
       if (requestInFlight.current) {
-        setError("An analysis is still running. Reopen your saved report after it finishes.");
+        setNotice("An analysis is still running. Reopen your saved report after it finishes.");
         return;
       }
       setContent(saved.original);
