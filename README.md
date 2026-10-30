@@ -53,7 +53,21 @@ The UI offers two actual server-side workflows:
 
 Both modes use the same citation validation, uncertainty and Upstash rate limiting. The API returns its actual mode. Without a mode, the API defaults to Quick Check. Neither mode fabricates results.
 
-Live Vercel latency for each mode needs verification before relying on it for demonstrations.
+An independent October 30 production integration smoke test reported **11.4 seconds for one Quick Check** and **20.8 seconds for one Deep Investigation** on the same sample claim. These are two individual observations, **not an accuracy benchmark or latency guarantee**. Actual inference and search providers can behave differently during demonstrations.
+
+## Hackathon judge quick start (October 30 deadline)
+
+- **Live, no-signup app:** https://evidencepilot-ai-flame.vercel.app/
+- **Best-fitting track:** Best Apps and Agents.
+- **Runtime requirements:** NVIDIA Nemotron 3 Super through Nebius Token Factory; Tavily live source retrieval. **Vercel hosts the app; it is not hosted on Nebius AI Cloud.**
+- **Test claim:** `Apollo 11 landed humans on the Moon in July 1969.` Run Quick Check, open a retrieved original source, then try Deep Investigation with the same statement. Searches and model calls are real; source URLs are not fabricated by the model.
+- **Review outputs:** evidence coverage and citation relationships, editable reader source notes, Human Editorial Desk, JSON/Markdown exports, locally reopen/compare prior reports. **No AI verdict is an independent fact verification.**
+- **Boundaries:** maximum 3 claims, 12,000 characters and 16 KB serialized JSON body; complete AI text rewriting only for originals up to 6,000 characters. Longer documents retain the full original without pretending a partial rewrite is complete. Production is rate limited to **3 analyses/minute/IP**.
+- **Run locally:** follow the setup above with your own server-only Nebius/Tavily credentials, optionally an Upstash Redis REST connection for a production deployment.
+
+**Submission operator links:** [official-rule checklist and exact Devpost fields](docs/hackathon-submission-checklist.md), [real browser video script under three minutes](docs/demo-video-script.md), [required Nebius/NVIDIA/Tavily feedback draft](docs/submission-feedback.md), and [complete project description](docs/devpost-submission.md).
+
+**Important:** A Devpost draft is not a submitted entry. An actual **Public** YouTube screen recording and final Devpost submission are required by **18:00 Oslo time on October 30, 2026**. Judge access must remain free and available through the published December 2026 judging period.
 
 ## Demonstration runbook
 

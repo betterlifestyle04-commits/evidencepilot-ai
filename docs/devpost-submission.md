@@ -27,7 +27,7 @@ Paste a short article or claim and select **Quick Check** or **Deep Investigatio
 3. Asks Nemotron to assess the *original extracted claim* against those retrieved excerpts, explaining support, contradiction, mixed evidence, or insufficient evidence.
 4. Validates cited result indices and maps displayed URLs to real Tavily results. The AI cannot invent a displayed source URL. Unsupported decisive verdicts are downgraded.
 5. Shows source relationships, investigation details, evidence coverage, and uncertainty; never labels retrieval alone as source authentication.
-6. Produces a cautious rewrite and supports human source-review notes, editorial decisions, printable findings, Markdown/JSON export, reopening and local comparison of saved snapshots.
+6. Produces a cautious rewrite for original inputs up to 6,000 characters. For longer documents, it preserves the full original without presenting an incomplete AI rewrite as if it covered all the text. It also supports human source-review notes, editorial decisions, printable findings, Markdown/JSON export, reopening and local comparison of saved snapshots.
 
 Public demo requires no account and warns users not to submit private or sensitive content. Local report review and comparison do not trigger fresh AI requests.
 
@@ -83,6 +83,8 @@ Broader multilingual and cross-language evaluation; stronger temporal evidence h
 - Technical evidence methodology: https://github.com/betterlifestyle04-commits/evidencepilot-ai/blob/main/docs/evidence-methodology-v2.md
 - Real Quick/Deep production smoke-check evidence (with limitations): https://github.com/betterlifestyle04-commits/evidencepilot-ai/blob/main/docs/live-integration-check-2026-10-30.md
 - Public YouTube demo: **ADD THE ACTUAL PUBLIC VIDEO URL BEFORE FINAL SUBMISSION**
+
+For a word-for-word recording plan, truthful footage requirements and exact public YouTube upload steps, use [the final demo video script](demo-video-script.md). For the rule-by-rule status and your existing Devpost draft editor, use [the last-mile submission checklist](hackathon-submission-checklist.md). For specific mandatory sponsor feedback, review [the Nebius/NVIDIA/Tavily feedback draft](submission-feedback.md).
 
 ## Recommended 2:45 demonstration video (real app, not a mock)
 
