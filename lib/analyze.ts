@@ -1,5 +1,5 @@
 import { categorizeSource, rankSearchResults, sanitizeSearchResults, sourcesFor, type Assessment, type SearchResult } from "./evidence";
-import { ProviderError, type ResearchPlan } from "./providers";
+import { MAX_REWRITE_INPUT_CHARS, ProviderError, type ResearchPlan } from "./providers";
 
 export type AnalysisMode = "quick" | "deep";
 /** Expected, non-provider error: the supplied text has no checkable facts. */
@@ -128,14 +128,20 @@ export async function analyzeContent(content: string, providers: AnalysisProvide
     const batch = await Promise.all(claims.slice(index, index + 2).map(investigate));
     reviewed.push(...batch);
   }
-  nebiusCalls++;
   let rewrite = content;
-  let rewriteStatus: "unavailable" | undefined;
-  try {
-    rewrite = await providers.cautiousRewrite(content, reviewed);
-  } catch (error) {
-    if (error instanceof ProviderError && error.kind === "configuration") throw error;
-    rewriteStatus = "unavailable";
+  let rewriteStatus: "unavailable" | "skipped_for_length" | undefined;
+  if (content.length > MAX_REWRITE_INPUT_CHARS) {
+    // A one-pass rewrite would see only the first 6,000 chars; retain the complete
+    // original rather than silently dropping or misrepresenting the remainder.
+    rewriteStatus = "skipped_for_length";
+  } else {
+    nebiusCalls++;
+    try {
+      rewrite = await providers.cautiousRewrite(content, reviewed);
+    } catch (error) {
+      if (error instanceof ProviderError && error.kind === "configuration") throw error;
+      rewriteStatus = "unavailable";
+    }
   }
   return {
     claims: reviewed,
