@@ -105,9 +105,10 @@ function parseClaim(value: unknown): ClaimInsight {
     retrievalStatus
   };
 }
-function pRewriteStatus(value: unknown): "unavailable" | undefined {
+function pRewriteStatus(value: unknown): "unavailable" | "skipped_for_length" | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  return (value as Record<string, unknown>).rewriteStatus === "unavailable" ? "unavailable" : undefined;
+  const status = (value as Record<string, unknown>).rewriteStatus;
+  return status === "unavailable" || status === "skipped_for_length" ? status : undefined;
 }
 function validTimestamp(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return null;
@@ -125,7 +126,13 @@ export function parseSavedReport(raw: string): SavedSnapshot {
     throw new Error("The saved report needs between one and three claim assessments.");
   }
   const claims = reportValue.claims.map(parseClaim);
-  const rewrite = text(reportValue.rewrite, 8_000, "suggested revision");
+  const rewriteStatus = pRewriteStatus(reportValue.investigation);
+  // A length-skipped report deliberately preserves the entire <=12,000-character
+  // original. Its JSON export must be reopenable without allowing an invented edit.
+  const rewrite = text(reportValue.rewrite, rewriteStatus === "skipped_for_length" ? 12_000 : 8_000, "suggested revision");
+  if (rewriteStatus === "skipped_for_length" && rewrite !== original) {
+    throw new Error("A length-skipped saved report must preserve its original text unchanged.");
+  }
   const model = text(reportValue.model, 200, "model name");
   const mode = oneOf<AnalysisMode>(reportValue.mode, new Set(["quick", "deep"]));
   const calls = reportValue.providerCalls;
@@ -145,7 +152,7 @@ export function parseSavedReport(raw: string): SavedSnapshot {
       investigation = { durationMs: durationMs!, uniqueSearches: uniqueSearches!, followupSearches: followupSearches!, partialClaims: partialClaims! };
     }
   }
-  if (investigation) investigation.rewriteStatus = pRewriteStatus(reportValue.investigation);
+  if (investigation) investigation.rewriteStatus = rewriteStatus;
   const urls = new Set(claims.flatMap(claim => claim.sources.map(source => source.url)));
   const review = file.manualSourceReview;
   const reviewedUrls: string[] = [];

@@ -39,3 +39,36 @@ test("live Nemotron verdict is downgraded when provider omits required citation 
     assert.doesNotMatch(result.explanation,/proves this/i);
   }finally{globalThis.fetch=previousFetch;if(previousKey===undefined)delete process.env.NEBIUS_API_KEY;else process.env.NEBIUS_API_KEY=previousKey;}
 });
+
+
+test("one-pass cautious rewrite refuses to silently truncate long input", async () => {
+  const previousFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async () => { requests++; throw new Error("Provider should never be contacted"); };
+  try {
+    await assert.rejects(
+      () => cautiousRewrite("a".repeat(6_001), []),
+      (error: unknown) => error instanceof ProviderError && error.kind === "invalid_response"
+    );
+    assert.equal(requests, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});
+test("overlong model rewrite output is never presented as a valid truncated correction", async () => {
+  const previousFetch = globalThis.fetch, previousKey = process.env.NEBIUS_API_KEY;
+  process.env.NEBIUS_API_KEY = "test";
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: JSON.stringify({ rewrite: "a".repeat(8_001) }) } }]
+  }), { status: 200 });
+  try {
+    await assert.rejects(
+      () => cautiousRewrite("A short input that needs a complete rewrite.", []),
+      (error: unknown) => error instanceof ProviderError && error.kind === "invalid_response"
+    );
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.NEBIUS_API_KEY;
+    else process.env.NEBIUS_API_KEY = previousKey;
+  }
+});

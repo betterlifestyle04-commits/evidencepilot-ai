@@ -112,3 +112,19 @@ test("browser import uses the same public-source URL safety policy as live resea
   good.report.claims[0].sources[0].url="https://example.org/article?id=42";
   assert.equal(parseSavedReport(JSON.stringify(good)).report.claims[0].sources[0].url,"https://example.org/article?id=42");
 });
+
+
+test("reopens a complete length-skipped export without rejecting its 12k-character original", () => {
+  const fixture = exportFixture();
+  const original = "Jupiter is the largest planet in our Solar System. ".repeat(225);
+  assert.ok(original.length > 8_000 && original.length <= 12_000);
+  fixture.original = original;
+  fixture.report.rewrite = original;
+  (fixture.report.investigation as typeof fixture.report.investigation & {rewriteStatus?:string}).rewriteStatus = "skipped_for_length";
+  const saved = parseSavedReport(JSON.stringify(fixture));
+  assert.equal(saved.report.investigation?.rewriteStatus, "skipped_for_length");
+  assert.equal(saved.report.rewrite, original);
+  assert.equal(saved.editorialReview.draft, original);
+  fixture.report.rewrite = original.slice(0, 6_000);
+  assert.throws(() => parseSavedReport(JSON.stringify(fixture)), /preserve its original text unchanged/);
+});
