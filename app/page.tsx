@@ -1,6 +1,6 @@
 import Analyzer from "./analyzer";
 export default function Home() {
-  return <main>
+  return <main id="main-content" tabIndex={-1}><a href="#main-content" className="skip-link">Skip to main content</a>
     <header className="site-header">
       <a className="brand" href="/" aria-label="EvidencePilot home">Evidence<span>Pilot</span></a>
       <nav className="site-nav" aria-label="Main navigation">
