@@ -175,9 +175,33 @@ export default function Analyzer() {
     fileReadGeneration.current++;
     setNoCheckableClaims(false);
     setContent(text);
-    setReport(null);
     setError("");
-    setNotice("Sample claim loaded. Select Analyze to perform a live evidence review.");
+    // A sample fills only the input. Never destroy the previous investigation,
+    // its manually reviewed sources, or its editorial draft without consent.
+    setNotice(report
+      ? "Example loaded. Your earlier report and review notes remain below; Analyze again to check the new text."
+      : "Sample claim loaded. Select Analyze to perform a live evidence review.");
+    document.getElementById("content")?.focus();
+  }
+
+  function clearEditor() {
+    if (requestInFlight.current) return;
+    fileReadGeneration.current++;
+    setContent("");
+    setNoCheckableClaims(false);
+    setError("");
+    setNotice(report
+      ? "Editor cleared. Your earlier completed report is preserved below and still refers to its original text."
+      : "Editor cleared.");
+  }
+
+  function restoreAnalyzedText() {
+    if (!report || requestInFlight.current) return;
+    fileReadGeneration.current++;
+    setContent(submittedContent);
+    setError("");
+    setNoCheckableClaims(false);
+    setNotice("Reopened the exact text from your last report. No new AI or web requests were made.");
     document.getElementById("content")?.focus();
   }
 
@@ -375,7 +399,7 @@ export default function Analyzer() {
               placeholder="Paste something worth checking...&#10;&#10;Example: The first iPhone was introduced in 2007. The original iPhone supported 5G connectivity."
               aria-describedby="text-guidance"
             />
-            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={() => { fileReadGeneration.current++; setContent(""); setReport(null); setError(""); setNotice(""); }} disabled={busy || content.length === 0}>Clear text</button></div>
+            <div className="input-meta"><span id="text-guidance">{wordCount} words · {content.length.toLocaleString()} / 12,000 characters · {payloadBytes.toLocaleString()} / {MAX_ANALYSIS_BODY_BYTES.toLocaleString()} request bytes</span><button className="link-button" type="button" onClick={clearEditor} disabled={busy || content.length === 0}>Clear text</button></div>
             {oversizedPayload && <p className="payload-limit-warning" role="alert">This text uses {payloadBytes.toLocaleString()} UTF-8 JSON request bytes, exceeding the 16 KB demo limit. Shorten it before analyzing. Accents, Arabic and emoji may take more than one byte per character.</p>}
             {content.length > MAX_REWRITE_INPUT_CHARS && <p className="rewrite-length-warning">Long document: claim-by-claim analysis is available, but a complete AI rewrite is limited to 6,000 characters. Your original document will be retained unchanged for manual editing; no text will be silently omitted.</p>}
             <div className="import-row"><label className="import-file">↑ Import .txt or .md<input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Import a text or Markdown file" onChange={(event) => { void importTextFile(event.target.files?.[0]); event.target.value = ""; }} disabled={busy} /></label><span className="import-note">Files are read in your browser, not uploaded until analysis.</span></div>
@@ -438,7 +462,7 @@ export default function Analyzer() {
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
           <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title" tabIndex={-1}>Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
-          {pendingUnanalyzedEdits && !busy && <p className="previous-report-note" role="status"><strong>Input changed since this report:</strong> The findings below refer to the previously analyzed text, not the passage now in the editor. Run a new analysis to update them.</p>}
+          {pendingUnanalyzedEdits && !busy && <div className="report-outdated-actions" role="status"><p className="previous-report-note"><strong>Input changed since this report:</strong> The findings below refer to the previously analyzed text, not the passage now in the editor. Run a new analysis to update them.</p><button type="button" className="secondary-button" onClick={restoreAnalyzedText}>Restore analyzed text</button></div>}
           {!busy && !error && report.mode !== mode && !importedReport && <p className="previous-report-note">This saved result used {report.mode === "deep" ? "Deep Investigation" : "Quick Check"}. The selected mode applies only to your next request.</p>}
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
           {(report.investigation?.partialClaims || rewriteUnavailable) && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation?.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation?.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}{report.investigation?.rewriteStatus === "skipped_for_length" ? "Full-text rewriting was skipped because the input exceeds 6,000 characters; all original text remains intact. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}

@@ -318,3 +318,9 @@
 /* Disclose when claim assessment will not include a full AI rewrite. */
 .rewrite-length-warning{font-size:12px;line-height:1.7;margin:10px 0 12px;padding:12px 14px;color:#395772;background:#f2f7fc;border:1px solid #cbddeb;border-radius:9px}
 @media print{.rewrite-length-warning{display:none!important}}
+
+/* Preserve the previous investigation while the editor holds a new, unanalysed draft. */
+.report-outdated-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border:1px solid #cbddec;background:#f2f7fc;border-radius:12px;margin:12px 0 18px;padding:12px 14px}
+.report-outdated-actions .previous-report-note{border:0;background:transparent;margin:0;flex:1 1 320px}
+.report-outdated-actions .secondary-button{flex:0 0 auto}
+@media print{.report-outdated-actions button{display:none!important}}
