@@ -177,3 +177,39 @@ test("retrieval and assessment failure preserve the extracted claim, never plann
     assert.equal(report.claims[0].researchPlan?.normalizedClaim,drift);
   }
 });
+
+
+test("long documents are fully retained instead of being silently half-rewritten", async () => {
+  const original = "Jupiter is the largest planet in our Solar System. ".repeat(170);
+  assert.ok(original.length > 6_000 && original.length <= 12_000);
+  let rewrites = 0;
+  const report = await analyzeContent(original, {
+    extractClaims: async () => ["Jupiter is the largest planet in our Solar System."],
+    planClaim: async claim => ({ ...plan(claim), queries: ["Jupiter largest planet NASA"] }),
+    searchClaim: async () => [
+      { title: "NASA overview", url: "https://science.nasa.gov/jupiter/", content: "Jupiter is the largest planet." },
+      { title: "NASA solar system", url: "https://science.nasa.gov/solar-system/", content: "Solar System planets." }
+    ],
+    assess: async claim => ({ claim, verdict: "supported", explanation: "Retrieved record supports it.", sourceIndices: [0] }),
+    cautiousRewrite: async () => { rewrites++; return "Partial and unsafe rewrite"; }
+  }, "deep");
+  assert.equal(rewrites, 0, "the unsafe truncated rewrite must not run");
+  assert.equal(report.rewrite, original, "the full original must remain byte-for-byte intact");
+  assert.equal(report.investigation.rewriteStatus, "skipped_for_length");
+  assert.equal(report.claims.length, 1);
+  assert.equal(report.providerCalls.nebius, 3, "a skipped provider call must not be charged in the workflow count");
+});
+test("the precise rewrite limit still allows a full short-text rewrite", async () => {
+  const original = "X".repeat(6_000);
+  let rewrites = 0;
+  const report = await analyzeContent(original, {
+    extractClaims: async () => ["A factual claim long enough."],
+    planClaim: async claim => plan(claim),
+    searchClaim: async () => [{ title: "Record", url: "https://example.org/page", content: "Evidence" }],
+    assess: async claim => ({ claim, verdict: "supported", explanation: "Record discusses claim.", sourceIndices: [0] }),
+    cautiousRewrite: async () => { rewrites++; return "A complete cautious statement."; }
+  }, "quick");
+  assert.equal(rewrites, 1);
+  assert.equal(report.investigation.rewriteStatus, undefined);
+  assert.equal(report.rewrite, "A complete cautious statement.");
+});
