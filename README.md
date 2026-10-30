@@ -58,3 +58,5 @@ Live Vercel latency for each mode needs verification before relying on it for de
 ## Demonstration runbook
 
 For the [operator checklist and three-minute recording outline](docs/demo-runbook.md), use the credit-free `npm run smoke:demo` deployment check first. Add `--live` only when you explicitly want two real Quick/Deep analyses. This is not an accuracy benchmark and does not automatically retry failed requests.
+
+For the [Devpost-ready project description, truthful technical narrative, and final submission checklist](docs/devpost-submission.md), review the hackathon submission pack before uploading the public YouTube demo and finalizing the entry.
