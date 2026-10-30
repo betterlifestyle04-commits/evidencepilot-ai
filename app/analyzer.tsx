@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { analysisFailure } from "./analysis-feedback";
+import { readAnalysisPayload } from "./analysis-response";
+import { hasUnanalyzedEdits } from "./report-state";
 import { analysisPayloadBytes, MAX_ANALYSIS_BODY_BYTES } from "../lib/request-body";
 import { SourceReviewDesk, uniqueCitedSources } from "./source-review";
 import { parseSavedReport } from "./report-import";
@@ -129,6 +131,7 @@ export default function Analyzer() {
   const oversizedPayload = payloadBytes > MAX_ANALYSIS_BODY_BYTES;
   const canAnalyze = content.trim().length >= 20 && content.length <= 12_000 && !oversizedPayload && !busy && waitSeconds === 0;
   const markdown = report ? reportMarkdown(report, submittedContent, reviewedUrls, completedAt, sourceNotes, editorialDraft, editorialDecisions) : "";
+  const pendingUnanalyzedEdits = hasUnanalyzedEdits(Boolean(report), content, submittedContent);
   const counts: Record<Verdict, number> = { supported: 0, contradicted: 0, mixed: 0, insufficient_evidence: 0 };
   report?.claims.forEach((item) => { if (counts[item.verdict] !== undefined) counts[item.verdict] += 1; });
 
@@ -166,6 +169,7 @@ export default function Analyzer() {
   }
 
   function useExample(text: string) {
+    if (requestInFlight.current) return;
     setNoCheckableClaims(false);
     setContent(text);
     setReport(null);
@@ -249,8 +253,7 @@ export default function Analyzer() {
         body: JSON.stringify({ content: submitted, mode }),
         signal: AbortSignal.timeout(75_000)
       });
-      const data: unknown = await response.json();
-      const payload = data as Partial<Report> & { error?: string; requestId?: string };
+      const payload = await readAnalysisPayload(response) as Partial<Report> & { error?: string; requestId?: string };
       if (!response.ok) {
         setNoCheckableClaims(response.status === 422 && (payload as { code?: unknown }).code === "NO_CHECKABLE_CLAIMS");
         const feedback = analysisFailure(response.status, payload, response.headers.get("retry-after"));
@@ -393,7 +396,7 @@ export default function Analyzer() {
           <div className="examples">
             <div className="examples-heading"><span>TRY AN EXAMPLE</span><span>These only fill the input — no results are fabricated.</span></div>
             <div className="examples-list">
-              {examples.map((example) => <button key={example.tag} type="button" className="example-card" onClick={() => useExample(example.text)}><span className="example-tag">{example.tag}</span><strong>{example.title}</strong><span className="example-arrow" aria-hidden="true">↗</span></button>)}
+              {examples.map((example) => <button key={example.tag} type="button" className="example-card" onClick={() => useExample(example.text)} disabled={busy}><span className="example-tag">{example.tag}</span><strong>{example.title}</strong><span className="example-arrow" aria-hidden="true">↗</span></button>)}
             </div>
           </div>
         </div>
@@ -422,6 +425,7 @@ export default function Analyzer() {
       {report && (
         <section className="results" id="results" aria-labelledby="results-title">
           <div className="results-heading"><div><span className="step-index">02 / EVIDENCE REPORT · {report.mode === "deep" ? "DEEP INVESTIGATION" : "QUICK CHECK"}</span>{importedReport && <span className="saved-report-badge">Reopened saved snapshot</span>}<h2 id="results-title">Your analysis, unpacked.</h2><p>Review each assessment and open the sources before relying on it.</p>{completedAt && <p className="report-completed-at">Report completed: {new Date(completedAt).toLocaleString()}</p>}</div><div className="result-actions"><button type="button" className="secondary-button" onClick={() => copyText(markdown, "Report")}>Copy report</button><button type="button" className="secondary-button" onClick={downloadJson}>Export JSON</button><button type="button" className="dark-button" onClick={downloadReport}>↓ Export .md</button></div></div>
+          {pendingUnanalyzedEdits && !busy && <p className="previous-report-note" role="status"><strong>Input changed since this report:</strong> The findings below refer to the previously analyzed text, not the passage now in the editor. Run a new analysis to update them.</p>}
           {!busy && !error && report.mode !== mode && !importedReport && <p className="previous-report-note">This saved result used {report.mode === "deep" ? "Deep Investigation" : "Quick Check"}. The selected mode applies only to your next request.</p>}
           {importedReport && <p role="status" className="saved-report-warning"><strong>Saved investigation:</strong> This report was imported locally. Its verdicts, citations and timestamps were not refreshed or independently authenticated. Use Analyze again to perform new research.</p>}
           {(report.investigation?.partialClaims || report.investigation?.rewriteStatus === "unavailable") && <div className="partial-result-notice" role="status"><strong>Partial analysis:</strong> {report.investigation.partialClaims ? report.investigation.partialClaims + " claim(s) could not be fully assessed. " : ""}{report.investigation.rewriteStatus === "unavailable" ? "AI rewriting was unavailable, so the original submitted text was retained. " : ""}Please inspect the evidence and do not treat missing conclusions as verified.</div>}
