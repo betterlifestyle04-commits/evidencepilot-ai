@@ -14,7 +14,7 @@
 | `TAVILY_API_KEY` | Server-only Tavily Search credential |
 | `UPSTASH_REDIS_REST_URL` | Shared rate-limit service URL |
 | `UPSTASH_REDIS_REST_TOKEN` | Shared rate-limit service credential |
-| `NEBIUS_MODEL` | Optional override; default is `nvidia/Nemotron-3_5-Lightning` |
+| `NEBIUS_MODEL` | Optional override; default is `nvidia/nemotron-3-super-120b-a12b` |
 
 No key may use a `NEXT_PUBLIC_` prefix. In production the API fails closed if the shared rate-limit store is absent, preventing unbounded credit consumption. The limit is three analyses per minute per forwarded client IP. Configure Vercel to pass `x-forwarded-for` and allow the 60-second function duration.
 
@@ -24,11 +24,11 @@ After securely binding credentials, run `npm run verify:providers`. It checks th
 
 ## Operational limits
 
-A normal three-claim report with usable evidence uses eight provider calls: five Nemotron and three Tavily. A Nebius `response_format` rejection triggers one JSON-only retry for that particular model call. A failed Tavily request is represented as an insufficient-evidence claim rather than destroying unrelated completed claims. If Tavily returns no usable public sources, the assessment call is skipped to save credits and the claim is marked insufficient evidence. Provider errors returned to the browser are sanitized; keys and upstream response bodies are never returned or logged.
+A three-claim **Quick Check** typically uses five Nemotron calls and three Tavily searches. **Deep Investigation** typically uses eight Nemotron calls and three to six Tavily searches; optional provider compatibility fallbacks can add model calls. A Nebius `response_format` rejection triggers one JSON-only retry for that particular model call. A failed Tavily request is represented as an insufficient-evidence claim rather than destroying unrelated completed claims. If Tavily returns no usable public sources, the assessment call is skipped to save credits and the claim is marked insufficient evidence. Provider errors returned to the browser are sanitized; keys and upstream response bodies are never returned or logged.
 
 If an individual Nemotron assessment fails after retrieval, that one claim is returned as insufficient evidence with `retrievalStatus: "assessment_unavailable"`; other claims remain available. If only the optional cautious rewrite fails, the report returns the original submitted text and `investigation.rewriteStatus: "unavailable"` rather than fabricating a correction or discarding completed claim work. Rate-limit keys use a truncated SHA-256 identifier, so Upstash receives a pseudonymous client key rather than the raw forwarded address.
 
-Requests must be JSON, have a declared body at or below 16 KB, and receive `no-store`/`nosniff` API response headers. Tavily results are deduplicated and only public HTTPS URLs are allowed through to assessment and rendering; local, credential-bearing, insecure, and malformed URLs are discarded.
+Requests must be valid JSON and contain no more than 16,000 actual UTF-8 bytes, regardless of whether Content-Length is declared, and receive `no-store`/`nosniff` API response headers. Tavily results are deduplicated and only public HTTPS URLs are allowed through to assessment and rendering; local, credential-bearing, insecure, and malformed URLs are discarded.
 
 ## Troubleshooting and operational transparency
 
