@@ -208,3 +208,28 @@ test("legacy evidence parser remains compatible with earlier saved model payload
   const legacy=validateAssessment({claim:"Older claim",verdict:"supported",explanation:"Prior response",sourceIndices:[0]},src);
   assert.equal(legacy.verdict,"supported");
 });
+
+
+test("ranks relevant Arabic-language sources above unrelated results", () => {
+  const ranked = rankSearchResults([
+    { title: "Alpha technology update", url: "https://example.org/unrelated", content: "General technology news" },
+    { title: "القاهرة عاصمة مصر", url: "https://example.org/cairo", content: "كانت القاهرة عاصمة مصر في العصر الحديث" }
+  ], "كانت القاهرة عاصمة مصر في العصر الحديث.");
+  assert.equal(ranked[0].url, "https://example.org/cairo");
+});
+
+test("matches accented claims to unaccented source titles", () => {
+  const ranked = rankSearchResults([
+    { title: "Aardvark updates", url: "https://example.org/other", content: "Unrelated information" },
+    { title: "Cafe culture", url: "https://example.org/cafe", content: "History of cafe culture" }
+  ], "Le café mérite une enquête.");
+  assert.equal(ranked[0].url, "https://example.org/cafe");
+});
+
+test("keeps provider ranking for otherwise equal source relevance", () => {
+  const ranked = rankSearchResults([
+    { title: "Zebra reference", url: "https://example.org/z", content: "An unrelated snippet" },
+    { title: "Apple reference", url: "https://example.org/a", content: "Another unrelated snippet" }
+  ], "An utterly unmatched subject.");
+  assert.deepEqual(ranked.map(source => source.url), ["https://example.org/z", "https://example.org/a"]);
+});

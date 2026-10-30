@@ -25,6 +25,12 @@ Nemotron returns `strong`, `moderate`, `limited`, or `insufficient` evidence str
 
 `evaluations/claims-v1.json` contains ten curated claims across science, history, technology, health, politics, statistics, time-sensitive, ambiguous, and insufficient-evidence scenarios. Each expected outcome is accompanied by an independently checked reference URL. Run `npm run evaluate:live` only after securely configuring provider keys. It prints actual verdicts, citation counts, and elapsed durations; it does not claim accuracy automatically or persist provider data.
 
+## Multilingual retrieval-order safeguard (October 30, 2026)
+
+Source relevance tokenization recognizes Unicode letters and digits rather than English-only words. Claim and source text are case-folded and normalized for compatibility accents/diacritics (for example, café/cafe, and Arabic vowel marks). This improves ordering when the retrieved title/excerpt uses the same script and key phrases. When the heuristic cannot find any overlapping terms, it preserves the search provider's returned order instead of sorting arbitrarily by title.
+
+**Limitations:** this is not translation, cross-lingual semantic retrieval, a credibility guarantee, or a multilingual accuracy benchmark. Different-language sources may still have zero literal overlap, requiring independent human review.
+
 ## Known limitations
 
 Search ranking can omit decisive material, source categories are fallible, text excerpts can lack context, and generated assessments can be wrong. Time-sensitive claims require especially careful review. Users must open and assess original sources before publishing conclusions.
