@@ -22,7 +22,7 @@ export type ClaimInsight = {
 export type InvestigationSummary = {
   durationMs: number; uniqueSearches: number;
   followupSearches: number; partialClaims: number;
-  rewriteStatus?: "unavailable";
+  rewriteStatus?: "unavailable" | "skipped_for_length";
 };
 const relationships: Record<NonNullable<EvidenceDetail["relationship"]>, string> = {
   supports: "Supports", contradicts: "Challenges", context: "Context", inconclusive: "Inconclusive"
