@@ -308,3 +308,9 @@
 /* Character limits and UTF-8 wire limits are different; report both honestly. */
 .payload-limit-warning{font-size:12px;line-height:1.7;margin:10px 0 12px;padding:12px 14px;color:#8b3d28;background:#fff4ec;border:1px solid #f0d1bc;border-radius:9px}
 @media print{.payload-limit-warning{display:none!important}}
+
+/* Visible keyboard shortcut for skipping the navigation on every public page. */
+.skip-link{position:fixed;z-index:999;top:10px;left:12px;transform:translateY(-160%);padding:12px 18px;border:2px solid #c0efce;border-radius:9px;background:#153e32;color:#fff;font-weight:800;text-decoration:none;box-shadow:0 12px 28px #081e1766}
+.skip-link:focus,.skip-link:focus-visible{transform:translateY(0);outline:3px solid #a3e0bc;outline-offset:3px}
+@media print{.skip-link{display:none!important}}
+.compare-status-strength_changed{background:#ebf3ff;color:#325a8e}

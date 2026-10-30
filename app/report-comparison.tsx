@@ -7,7 +7,8 @@ import { parseSavedReport, type SavedReport, type SavedSnapshot } from "./report
 function statusLabel(row: ClaimDifference): string {
   switch (row.kind) {
     case "verdict_changed": return "Verdict changed";
-    case "sources_changed": return "Evidence trail changed";
+    case "sources_changed": return "Cited pages changed";
+    case "strength_changed": return "Evidence strength changed";
     case "new": return "New claim";
     case "missing": return "Not in current report";
     default: return "No tracked changes";
@@ -93,7 +94,7 @@ export default function ReportComparison({ current, completedAt }: { current: Sa
       <div className="compare-metrics" aria-label="Comparison summary">
         <div><strong>{comparison.matched}</strong><span>Matching claims</span></div>
         <div><strong>{comparison.changedVerdicts}</strong><span>Verdict differences</span></div>
-        <div><strong>{comparison.changedSources}</strong><span>Changed source trails</span></div>
+        <div><strong>{comparison.changedSources}</strong><span>Changed cited pages</span></div>
         <div><strong>{comparison.unmatched}</strong><span>Unmatched claims</span></div>
       </div>
       <div className="compare-options">
@@ -101,7 +102,7 @@ export default function ReportComparison({ current, completedAt }: { current: Sa
         <button type="button" className="secondary-button" onClick={() => void copyComparison()}>Copy comparison summary</button>
       </div>
       {!comparison.matched && <p className="compare-warning">No claims matched by normalized text. This tool does not guess whether differently worded claims mean the same thing.</p>}
-      {!shown.length ? <p className="compare-no-changes">There are no differences in verdict, evidence-strength label or cited source URLs for the matched claims. This is not proof that either report is correct.</p>
+      {!shown.length ? <p className="compare-no-changes">There are no differences in verdict, evidence-strength label or cited source pages for the matched claims. This is not proof that either report is correct.</p>
         : <div className="compare-claim-list">{shown.map((row, index) => <article className="compare-claim" key={row.claim + ":" + index}>
           <div className="compare-claim-heading"><h4>{row.claim}</h4><span className={"compare-status compare-status-" + row.kind}>{statusLabel(row)}</span></div>
           <div className="compare-verdicts">
@@ -114,7 +115,7 @@ export default function ReportComparison({ current, completedAt }: { current: Sa
             <SourceChanges title="No longer cited source URLs" urls={row.removedSources}/>
           </div>
         </article>)}</div>}
-      <p className="compare-caveat">Comparisons match claims only after normalizing capitalization, spacing and trailing punctuation. Different search results or model versions can produce different answers. A changed verdict or a new URL is not proof of improved accuracy. This tool never rechecks or authenticates the sources.</p>
+      <p className="compare-caveat">Comparisons match claims only after normalizing capitalization, spacing and trailing punctuation. Tracking-only URL parameters are ignored when comparing page identity. Different search results or model versions can produce different answers. A changed verdict or a new URL is not proof of improved accuracy. This tool never rechecks or authenticates the sources.</p>
     </div>}
   </section>;
 }

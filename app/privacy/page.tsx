@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Data & privacy", description: "Understand how EvidencePilot handles pasted content, third-party AI and search providers, and public-demo limitations." };
 export default function Privacy() {
-  return <main>
+  return <main id="main-content" tabIndex={-1}><a href="#main-content" className="skip-link">Skip to main content</a>
     <header className="site-header"><a className="brand" href="/">Evidence<span>Pilot</span></a><nav className="site-nav" aria-label="Main navigation"><a href="/#workspace">Analyze</a><a href="/how-it-works">How it works</a><a href="/privacy" aria-current="page">Privacy</a></nav></header>
     <article className="info-page">
       <div className="info-hero"><span className="step-index">TRANSPARENT BY DESIGN</span><h1>Your text deserves<br /><span>careful handling.</span></h1><p>EvidencePilot is a research demo that analyzes text using third-party AI and web-search services. Understand where your content goes before submitting it.</p><a className="primary-link" href="/#workspace">Return to analyzer ↗</a></div>
