@@ -105,9 +105,10 @@ function parseClaim(value: unknown): ClaimInsight {
     retrievalStatus
   };
 }
-function pRewriteStatus(value: unknown): "unavailable" | undefined {
+function pRewriteStatus(value: unknown): "unavailable" | "skipped_for_length" | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  return (value as Record<string, unknown>).rewriteStatus === "unavailable" ? "unavailable" : undefined;
+  const status = (value as Record<string, unknown>).rewriteStatus;
+  return status === "unavailable" || status === "skipped_for_length" ? status : undefined;
 }
 function validTimestamp(value: unknown): string | null {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return null;
